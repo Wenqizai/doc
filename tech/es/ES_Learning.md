@@ -76,7 +76,28 @@ GET /megacorp/employee/1
 ```
 
 #### 轻量搜索
+q：query-string
 
 ``` 
-GET /megacorp/employee/_search
+GET /megacorp/employee/_search?q=last_name:Smith
 ```
+
+#### 查询表达式搜索
+- **match**：查询
+
+领域特定语言 （DSL）， 使用 JSON 构造了一个请求。
+``` json
+GET /megacorp/employee/_search
+
+{
+  "query": {
+    "match": {
+      "last_name": "Smith"
+    }
+  }
+}
+```
+
+- **filter**：过滤器
+
+
