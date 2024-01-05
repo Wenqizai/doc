@@ -99,5 +99,60 @@ GET /megacorp/employee/_search
 ```
 
 - **filter**：过滤器
+查询 last_name is "smith" & age > 30 的 employee
+``` json
+GET /megacorp/employee/_search
+{
+  "query": {
+      "bool": {
+          "must": {
+              "match": {
+                  "last_name": "smith"
+              }
+          },
+          "filter": {
+            "range": {
+              "age": { "gt": 30 }
+            }
+          }
+      }
+  }
+}
+```
+#### 短语搜索
 
+Elasticsearch 在全文搜索中返回相关性的结果，区别于传统关系型数据库中，要么匹配要么不匹配的概念。
+当我们需要 Elasticsearch 达到这个匹配的效果，这时需要使用短语搜索了。
+
+```json
+GET /megacorp/employee/_search
+{
+  "query": {
+    "match_phrase": {
+      "about": "rock climbing"
+    }
+  }
+}
+```
+
+#### 高亮操作
+相关文档：[高亮搜索 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/highlighting-intro.html)
+
+```json
+GET /megacorp/employee/_search
+{
+  "query": {
+    "match_phrase": {
+      "about": "rock"
+    }
+  },
+  "highlight": {
+    "fields": {
+      "about":{}
+    }
+  }
+}
+```
+
+#### 聚合 aggregations
 
