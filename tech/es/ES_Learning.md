@@ -4,6 +4,41 @@
 官方文档：[Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/index.html)
 es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.cn/)
 
+### 材料准备
+
+#### quick start
+
+```json
+PUT /megacorp/employee/1
+{
+    "first_name" : "John",
+    "last_name" :  "Smith",
+    "age" :        25,
+    "about" :      "I love to go rock climbing",
+    "interests": [ "sports", "music" ]
+}
+
+PUT /megacorp/employee/2
+{
+    "first_name" :  "Jane",
+    "last_name" :   "Smith",
+    "age" :         32,
+    "about" :       "I like to collect rock albums",
+    "interests":  [ "music" ]
+}
+
+PUT /megacorp/employee/3
+{
+    "first_name" :  "Douglas",
+    "last_name" :   "Fir",
+    "age" :         35,
+    "about":        "I like to build cabinets",
+    "interests":  [ "forestry" ]
+}
+
+```
+
+
 ### 名词解析
 
 - 索引
@@ -155,4 +190,62 @@ GET /megacorp/employee/_search
 ```
 
 #### 聚合 aggregations
+注意：es 对于字段属性是 text 类型类型是不支持聚合分析的。如何要达到这种目的，有两个方法：
+1. 开启 "fielddata": true，不推荐（消耗大量内存）；
+2. 使用 field. keyword
+ 
+参看文档：[Text type family | Elasticsearch Guide \[8.11\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/reference/current/text.html#fielddata-mapping-param )
 
+- 查询员工的爱好，类型 group by
+```json
+GET /megacorp/employee/_search
+{
+  "aggs": {
+    "all_interests": {
+      "terms": {
+        "field":"interests.keyword"
+      }
+    }
+  }
+}
+```
+- 查看员工名字是 Smith 的爱好
+可以看到聚合的结果数据并非预先统计，而是<font color="#953734"><font color="#953734"><font color="#953734"><font color="#c0504d">根据匹配当前查询</font></font></font></font>的文档即时生成的。
+```json
+GET /megacorp/employee/_search
+{
+  "query": {
+    "match": {
+      "last_name": "Smith"
+    }
+  },
+  "aggs": {
+    "all_interests": {
+      "terms": {
+        "field":"interests.keyword"
+      }
+    }
+  }
+}
+```
+- 查询员工的爱好，并统计该项爱好的员工平均年龄
+聚合支持分级汇总，比如 group by a  => group by b => group by c，一级级 group by 聚合统计。
+```json
+GET /megacorp/employee/_search
+{
+  "aggs": {
+    "all_interests": {
+      "terms": {
+        "field": "interests.keyword"
+      },
+      "aggs": {
+        "avg_age": {
+          "avg": {
+            "field": "age"
+          }
+        }
+      }
+    }
+  }
+}
+```
