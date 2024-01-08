@@ -1,4 +1,4 @@
-# 文档
+# ES 文档
 ## 基于 es 2.x
 
 官方文档：[Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/index.html)
@@ -6,7 +6,8 @@ es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.c
 
 ### 材料准备
 
-#### quick start
+#### 1.  入门
+##### quick start
 
 ```json
 PUT /megacorp/employee/1
@@ -91,9 +92,10 @@ GET /megacorp/employee/1
 }
 ```
 
-### Quick Start
+### 1. 入门
+#### Quick Start
 
-#### 文档搜索
+##### 文档搜索
 
 ```json
 // 索引员工文档
@@ -110,14 +112,14 @@ PUT /megacorp/employee/1
 GET /megacorp/employee/1
 ```
 
-#### 轻量搜索
+##### 轻量搜索
 q：query-string
 
 ``` 
 GET /megacorp/employee/_search?q=last_name:Smith
 ```
 
-#### 查询表达式搜索
+##### 查询表达式搜索
 - **match**：查询
 
 领域特定语言 （DSL）， 使用 JSON 构造了一个请求。
@@ -154,7 +156,7 @@ GET /megacorp/employee/_search
   }
 }
 ```
-#### 短语搜索
+##### 短语搜索
 
 Elasticsearch 在全文搜索中返回相关性的结果，区别于传统关系型数据库中，要么匹配要么不匹配的概念。
 当我们需要 Elasticsearch 达到这个匹配的效果，这时需要使用短语搜索了。
@@ -170,7 +172,7 @@ GET /megacorp/employee/_search
 }
 ```
 
-#### 高亮操作
+##### 高亮操作
 相关文档：[高亮搜索 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/highlighting-intro.html)
 
 ```json
@@ -189,7 +191,7 @@ GET /megacorp/employee/_search
 }
 ```
 
-#### 聚合 aggregations
+##### 聚合 aggregations
 注意：es 对于字段属性是 text 类型类型是不支持聚合分析的。如何要达到这种目的，有两个方法：
 1. 开启 "fielddata": true，不推荐（消耗大量内存）；
 2. 使用 field. keyword
@@ -249,3 +251,4 @@ GET /megacorp/employee/_search
   }
 }
 ```
+#### 2. 集群
