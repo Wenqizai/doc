@@ -1,0 +1,105 @@
+version: "3.1"
+services:
+  node-1:
+    image: elasticsearch:7.2.0
+    container_name: node-1
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "TZ=Asia/Shanghai"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    volumes:
+      - /usr/local/docker/es/cluster/node-1/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - /usr/local/docker/es/cluster/node-1/plugins:/usr/share/elasticsearch/plugins
+      - /usr/local/docker/es/cluster/node-1/data:/usr/share/elasticsearch/data
+      - /usr/local/docker/es/cluster/node-1/log:/usr/share/elasticsearch/log
+    networks:
+      - elastic
+  node-2:
+    image: elasticsearch:7.2.0
+    container_name: node-2
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "TZ=Asia/Shanghai"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9201:9200"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    volumes:
+      - /usr/local/docker/es/cluster/node-2/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - /usr/local/docker/es/cluster/node-2/plugins:/usr/share/elasticsearch/plugins
+      - /usr/local/docker/es/cluster/node-2/data:/usr/share/elasticsearch/data
+      - /usr/local/docker/es/cluster/node-2/log:/usr/share/elasticsearch/log
+    networks:
+      - elastic
+  node-3:
+    image: elasticsearch:7.2.0
+    container_name: node-3
+    environment:
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - "TZ=Asia/Shanghai"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9202:9200"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+    volumes:
+      - /usr/local/docker/es/cluster/node-3/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - /usr/local/docker/es/cluster/node-3/plugins:/usr/share/elasticsearch/plugins
+      - /usr/local/docker/es/cluster/node-3/data:/usr/share/elasticsearch/data
+      - /usr/local/docker/es/cluster/node-3/log:/usr/share/elasticsearch/log
+    networks:
+      - elastic
+      
+  kibana:
+    container_name: kibana
+    image: kibana:7.2.0
+    volumes:
+      - /usr/local/docker/es/cluster/kibana/config/kibana.yml:/usr/share/kibana/config/kibana.yml
+    ports:
+      - 5601:5601
+    networks:
+      - elastic
+
+        
+  cerebro:
+    image: lmenezes/cerebro:0.8.3
+    container_name: cerebro
+    ports:
+      - "9000:9000"
+    command:
+      - -Dhosts.0.host=http://node-1:9200
+    networks:
+      - elastic
+      
+networks:
+  elastic:
+    driver: bridge

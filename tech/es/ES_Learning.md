@@ -3,7 +3,7 @@
 
 官方文档：[Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/index.html)
 es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.cn/)
-
+docker-compose 搭建集群：[ElasticSearch 集群部署 - 晓风残月的博客](https://www.baiyp.ren/elasticsearch-%E9%9B%86%E7%BE%A4%E9%83%A8%E7%BD%B2.html)
 ### 材料准备
 
 #### 1.  入门
@@ -38,6 +38,10 @@ PUT /megacorp/employee/3
 }
 
 ```
+
+##### 集群
+- 
+
 
 
 ### 名词解析
@@ -307,3 +311,47 @@ ES 利用分片将数据分发到集群的各个节点，分片存储相应的�
 **注意：** 文档是存储在分片中，但是<u>应用不是跟分片来交互，而是直接跟索引交互。</u>
 
 
+- 创建一个空节点集群内创建名为 `blogs` 的索引，索引分配 3 个主分片（默认分配 5 个主分片），1 个从分片。
+```json
+PUT /blogs
+{
+   "settings" : {
+      "number_of_shards" : 3,
+      "number_of_replicas" : 1
+   }
+}
+
+# 查看配置
+GET /blogs/_settings
+```
+ - 查看集群健康，可以看到分片分配情况
+```shell
+ GET _cluster/health
+
+# 返回
+{
+  "cluster_name" : "elasticsearch",
+  "status" : "yellow",
+  "timed_out" : false,
+  "number_of_nodes" : 1,
+  "number_of_data_nodes" : 1,
+  "active_primary_shards" : 9,
+  "active_shards" : 9,
+  "relocating_shards" : 0,
+  "initializing_shards" : 0,
+  "unassigned_shards" : 4,
+  "delayed_unassigned_shards" : 0,
+  "number_of_pending_tasks" : 0,
+  "number_of_in_flight_fetch" : 0,
+  "task_max_waiting_in_queue_millis" : 0,
+  "active_shards_percent_as_number" : 69.23076923076923
+}
+
+```
+  `"status" : "yellow"`：主分片运行正常，副分片运行不正常
+  `"unassigned_shards" : 4`：没有分配到任何节点的副本数
+  
+上述表明，副分片没有分配到其他节点上，在同一个节点上既保存原始数据又保存副本是没有意义的，因为一旦失去了那个节点，我们也将丢失该节点上所有的副本数据。
+
+##### 故障转移
+当集群拥有两个以上的节点，我们可以通过配置故障转移来防止单点故障的情况。
