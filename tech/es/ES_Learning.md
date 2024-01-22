@@ -1,9 +1,17 @@
 # ES 文档
 ## 基于 es 2.x
 
+### 相关文档资料
+
 官方文档：[Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/index.html)
 es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.cn/)
-docker-compose 搭建集群：[ElasticSearch 集群部署 - 晓风残月的博客](https://www.baiyp.ren/elasticsearch-%E9%9B%86%E7%BE%A4%E9%83%A8%E7%BD%B2.html)
+
+> 集群
+1. docker-compose 搭建集群：[ElasticSearch 集群部署 - 晓风残月的博客](https://www.baiyp.ren/elasticsearch-%E9%9B%86%E7%BE%A4%E9%83%A8%E7%BD%B2.html)
+2. 集群节点升级：[记一次ES生产集群数据节点扩容的操作过程-腾讯云开发者社区-腾讯云](https://cloud.tencent.com/developer/article/1763280)
+3. ES 集群扩缩容：[ES集群的扩缩容 - 伊铭(netease) - 博客园](https://www.cnblogs.com/wxm-pythoncoder/p/16086781.html)
+
+
 ### 材料准备
 
 #### 1.  入门
@@ -354,4 +362,41 @@ GET /blogs/_settings
 上述表明，副分片没有分配到其他节点上，在同一个节点上既保存原始数据又保存副本是没有意义的，因为一旦失去了那个节点，我们也将丢失该节点上所有的副本数据。
 
 ##### 故障转移
-当集群拥有两个以上的节点，我们可以通过配置故障转移来防止单点故障的情况。
+当集群拥有两个以上的节点，我们可以通过配置故障转移来防止单点故障的情况。同时也可以动态调整分片的数量。
+
+我们知道**主分片**数量在索引创建时已经确定下来，因此 ES 的写操作的性能瓶颈也基本确定下来了。但是 ES 的读操作是主分片和副本分片共同分担处理的，因此拥有越多副分片，集群的容灾能力也越强，处理数据请求的吞吐量也越高。
+
+> NOTE:   当然，如果只是在相同节点数目的集群上增加更多的副本分片并不能提高性能，因为每个分片从节点上获得的资源会变少。你需要增加更多的硬件资源来提升吞吐量。
+> 
+> 但是更多的副本分片数提高了数据冗余量：按照上面的节点配置，我们可以在失去 2 个节点的情况下不丢失任何数据。
+
+- 调整副分片数量
+```json
+PUT /blogs/_settings
+{
+   "number_of_replicas" : 2
+}
+```
+
+- 自动切换
+当集群中的节点是一主二从的结构，关闭一个节点时（模拟节点故障情况）。集群中会自动选举一个节点成为主节点（主节点故障情况），对应的故障节点上的主分片会失效。此时选举后的主节点会立即将故障节点的主分片对应到其他节点的副分片提升位主分片。
+
+当故障节点恢复上线时，故障节点会从主分片中同步数据到本节点的副分片中。
+
+上述可知，ES 的故障转移，水平扩容等都是由 ES 自动来完成。
+
+1. 正常
+![image-20240122233826989.png](https://s2.loli.net/2024/01/22/XHaiWIlbRBoyFJC.png)
+
+2. node-1 下线
+![image.png](https://s2.loli.net/2024/01/22/cHQmKT7hE3Pq1Sg.png)
+
+3. node-1 上线
+![image.png](https://s2.loli.net/2024/01/22/w4gvDCtNbUi9lf7.png)
+
+
+
+
+
+
+
