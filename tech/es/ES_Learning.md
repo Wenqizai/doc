@@ -264,7 +264,7 @@ GET /megacorp/employee/_search
 }
 ```
 #### 2. 集群
-ES 天生技术是分布式，应用无需关注和国立多节点，ES 自身可以管理多节点，比如扩容，高可用等。
+ES 天生技术是分布式，应用无需关注和管理多节点，ES 自身可以管理多节点，比如扩容，高可用等。
 
 一个运行中的 Elasticsearch 实例称为一个节点，而<font color="#c00000">集群是由一个或者多个拥有相同 `cluster.name` 配置的节点组成</font>， 它们共同承担数据和负载的压力。当有节点加入集群中或者从集群中移除节点时，集群将会重新平均分布所有的数据。
 
@@ -285,10 +285,10 @@ ES 天生技术是分布式，应用无需关注和国立多节点，ES 自身�
 相关文档： [Different Elasticsearch components and what they mean in 5 mins](https://devopsideas.com/different-elasticsearch-components-and-what-they-mean-in-5-mins/)
 
 - 集群组件
-![[ES集群组件关系图.png]]
+![[ES集群组件关系图.png|425]]
 
 - 集群分片与健康
-![[集群状态关系图.png]]
+![[集群状态关系图.png|425]]
 
 
 
@@ -386,15 +386,18 @@ PUT /blogs/_settings
 上述可知，ES 的故障转移，水平扩容等都是由 ES 自动来完成。
 
 1. 正常
-![image-20240122233826989.png](https://s2.loli.net/2024/01/22/XHaiWIlbRBoyFJC.png)
+![image-20240122233826989.png|375](https://s2.loli.net/2024/01/22/XHaiWIlbRBoyFJC.png)
 
 2. node-1 下线
-![image.png](https://s2.loli.net/2024/01/22/cHQmKT7hE3Pq1Sg.png)
+![image.png|375](https://s2.loli.net/2024/01/22/cHQmKT7hE3Pq1Sg.png)
 
 3. node-1 上线
-![image.png](https://s2.loli.net/2024/01/22/w4gvDCtNbUi9lf7.png)
+![image.png|375](https://s2.loli.net/2024/01/22/w4gvDCtNbUi9lf7.png)
 
+### 数据输入和输出
+ES 是分布式的文档存储，能够存储和检索复杂的数据结构，序列化成 JSON 文档，以实时的方式。一旦一个文档被存储到 ES，它就可以被集群中的任意节点检索到。
 
+存储文档是一个方面，更重要的是我们需要查询这些文档，以特定的查询条件，批量且快速地查找到它们。在 ES 中，每个字段的所有数据数据都是默认被索引的，即每个字段都有为了快速检索设置的专用倒排索引。
 
 
 
