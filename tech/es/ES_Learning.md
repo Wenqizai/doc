@@ -50,8 +50,15 @@ PUT /megacorp/employee/3
 ##### 集群
 
 ##### 数据输入和输出 
-
-
+- 索引文档 
+```shell
+PUT /website/blog/123
+{
+  "title": "My first blog entry",
+  "text":  "Just trying this out...",
+  "date":  "2014/01/01"
+}
+```
 
 ### 名词解析
 
@@ -433,3 +440,118 @@ ID 是一个字符串，当它和 `_index` 以及 `_type` 组合就可以唯
 > 其他元数据
 
 类型和映射
+##### 索引文档
+- 文档的唯一标识
+
+```shell
+PUT /{index}/{type}{id}
+```
+
+- 建立文档
+可以指定 id，亦可不指定 id，由 ES 自动生成，但不能用 PUT, 要使用 POST。
+
+自动生成的 `_id ` 规则：URL-safe、 基于 Base64 编码且长度为20个字符的 GUID 字符串。 这些 GUID 字符串由可修改的 FlakeID 模式生成，这种模式允许多个节点并行生成唯一 ID ，且互相之间的冲突概率几乎为零。
+```shell
+PUT /website/blog/123
+{
+  "title": "My first blog entry",
+  "text":  "Just trying this out...",
+  "date":  "2014/01/01"
+}
+
+POST /website/blog/
+{
+  "title": "My first blog entry",
+  "text":  "Just trying this out...",
+  "date":  "2014/01/01"
+}
+```
+##### 文档操作
+> 文档查询
+
+返回全部字段：
+```shell
+GET /website/blog/123?pretty
+```
+
+返回指定字段： 
+```shell
+GET /website/blog/123?_source=text,date
+```
+
+只返回 `_source`
+```
+GET /website/blog/123/_source
+```
+
+**Note：** 加不加 `pretty` 的区别，就是返回 JSON 响应体更加可读的区别。
+
+- 检查文档是否存在
+文档存在：状态码 200，文档不存在：状态码 404
+```shell
+HEAD /website/blog/12
+```
+
+> 更新文档
+
+当返回结果 result 为 “updated” 时，代表文档已经存在，字段被更新，对应地 `_version` 字段增加 1。
+
+**Note：** ES 并不是直接对旧文档进行字段覆盖更新，而是新构建一个文档，就文档标志为已删除状态。已删除的文档不可访问，当未立即消失，而是由 es 在后台清理这些已删除的文档。
+
+文档更新过程： 
+	1. 从旧文档构建 JSON
+	2. 更改该 JSON
+	3. 删除旧文档
+	4. 索引一个新文档
+```shell
+-- 请求
+POST /website/blog/
+{
+  "title": "My first blog entry",
+  "text":  "Just trying this out...",
+  "date":  "2014/01/01"
+}
+-- 返回
+{
+  "_index" : "website",
+  "_type" : "blog",
+  "_id" : "123",
+  "_version" : 3,
+  "result" : "updated",
+  "_shards" : {
+    "total" : 2,
+    "successful" : 2,
+    "failed" : 0
+  },
+  "_seq_no" : 7,
+  "_primary_term" : 1
+}
+```
+
+> 不存在则创建，存在着不更新
+
+```shell
+PUT /website/blog/123?op_type=create
+{
+  "title": "My first blog entry => update",
+  "text":  "Just trying this out... => update",
+  "date":  "2014/01/01"
+}
+
+PUT /website/blog/123/_create
+{
+  "title": "My first blog entry => update",
+  "text":  "Just trying this out... => update",
+  "date":  "2014/01/01"
+}
+```
+
+> 删除旧文档 
+
+即使文档不存在（ `Found` 是 `false` ）， `_version` 值仍然会增加。这是 Elasticsearch 内部记录本的一部分，用来确保这些改变在跨多节点时以正确的顺序执行。
+
+**Note：** 这里也只是标记删除状态。
+
+```shell
+DELETE /website/blog/{id}
+```
