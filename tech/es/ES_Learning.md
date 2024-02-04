@@ -58,6 +58,15 @@ PUT /website/blog/123
   "text":  "Just trying this out...",
   "date":  "2014/01/01"
 }
+
+
+PUT /website/blog/1/_create
+{
+  "title": "My first blog entry",
+  "text":  "Just trying this out..."
+}
+
+
 ```
 
 ### 名词解析
@@ -555,3 +564,216 @@ PUT /website/blog/123/_create
 ```shell
 DELETE /website/blog/{id}
 ```
+
+> 更新文档
+
+给文档添加新的字段 `tags` 和 `views`。从返回的 `_version` 可以看到版本号递增了 1。可以知道，添加新字段也是走**新建文档和标志删除**的流程，只不过再新建文档时把新增的字段一起合并构建。
+
+```shell
+POST /website/blog/1/_update
+{
+  "doc": {
+    "tags" : ["testing"],
+    "views": 0
+  }
+}
+```
+
+##### 文档并发更新
+ES 是分布式的，当文档创建、更新或删除时，新的文档必须复制到集群中的其他节点。ES 采用的是异步和并发的方式，对文档进行复制。这种方式就会带来一些并发问题，比如乱序，覆盖更新等。
+
+ES 采用乐观锁的方式来控制并发问题。每个文档维护着一个版本号 `_version`，当文档被修改时版本号递增，旧版本的文档修改请求会被忽略。
+
+> 版本控制使用方式：
+
+使用 API，不存在则创建，存在则返回失败。每次请求都会返回版本 `_version` 。
+
+```shell
+# 请求
+PUT /website/blog/1/_create
+{
+  "title": "My first blog entry",
+  "text":  "Just trying this out..."
+}
+
+# 返回
+
+{
+  "_index" : "website",
+  "_type" : "blog",
+  "_id" : "1",
+  "_version" : 1,
+  "result" : "created",
+  "_shards" : {
+    "total" : 2,
+    "successful" : 2,
+    "failed" : 0
+  },
+  "_seq_no" : 10,
+  "_primary_term" : 1
+}
+
+```
+
+利用返回的 `_version`，构造需要更新版本（+1）的请求。版本满足则更新，版本不满足则返回 409。
+
+```shell
+# 请求
+PUT /website/blog/1?version=2&version_type=external
+{
+  "title": "My first blog entry version 2",
+  "text":  "Starting to get the hang of this...  version 2"
+}
+
+# 返回
+{
+  "_index" : "website",
+  "_type" : "blog",
+  "_id" : "1",
+  "_version" : 2,
+  "result" : "updated",
+  "_shards" : {
+    "total" : 2,
+    "successful" : 2,
+    "failed" : 0
+  },
+  "_seq_no" : 11,
+  "_primary_term" : 1
+}
+
+```
+
+##### 文档脚本更新
+对于那些 API 不能满足需求的情况，Elasticsearch 允许你使用脚本编写自定义的逻辑。默认的脚本语言是 [Groovy](http://groovy.codehaus.org/)，可以通过设置集群中的所有节点的 `config/elasticsearch.yml` 文件来禁用动态 Groovy 脚本。
+```yml
+script.groovy.sandbox.enabled: false
+```
+
+> 使用方式
+
+- 给字段 `view` 执行加 1
+```shell
+POST /website/blog/1/_update
+{
+   "script" : "ctx._source.views+=1"
+}
+```
+- 给字段 `tags` 增加描述，注意 `tags` 是 List 类型，需要调用 List 的 API。
+```shell
+# 请求
+POST /website/blog/1/_update
+{
+  "script": {
+    "source": "ctx._source.tags.add(params.new_tag)",
+   "params" : {
+      "new_tag" : "search"
+   }
+  }
+}
+# 返回
+{
+  "_index" : "website",
+  "_type" : "blog",
+  "_id" : "1",
+  "_version" : 7,
+  "result" : "updated",
+  "_shards" : {
+    "total" : 2,
+    "successful" : 2,
+    "failed" : 0
+  },
+  "_seq_no" : 16,
+  "_primary_term" : 2
+}
+```
+- 调用 API，删除 `tags` 中元素
+```shell
+POST /website/blog/1/_update
+{
+  "script": {
+    "source":  "ctx._source.tags.remove(2)"
+  }
+}
+```
+- 使用脚本，删除指定文档
+```shell
+# 数据准备
+GET /website/blog/2
+
+PUT /website/blog/2
+{
+  "title" : "My first blog entry version 2",
+    "text" : "Starting to get the hang of this...  version 2",
+    "views" : 1,
+    "tags" : [
+      "testing",
+      "search"
+    ]
+}
+
+# 删除脚本
+POST /website/blog/2/_update
+{
+    "script": {
+        "source": "ctx.op = ctx._source.views == params.count ? 'delete' : 'none'",
+        "params": {
+            "count": 1
+        }
+    }
+}
+
+# 删除返回
+{
+  "_index" : "website",
+  "_type" : "blog",
+  "_id" : "2",
+  "_version" : 5,
+  "result" : "deleted",
+  "_shards" : {
+    "total" : 2,
+    "successful" : 2,
+    "failed" : 0
+  },
+  "_seq_no" : 22,
+  "_primary_term" : 2
+}
+```
+
+- 更新不存在的文档
+假设我们需要在 Elasticsearch 中存储一个页面访问量计数器。每当有用户浏览网页，我们对该页面的计数器进行累加。但是，如果它是一个新网页，我们不能确定计数器已经存在。如果我们尝试更新一个不存在的文档，那么更新操作将会失败。
+
+在这样的情况下，我们可以使用 `upsert` 参数，指定如果文档不存在就应该先创建它：
+
+```shell
+# 旧方式，文档不存在则返回失败
+POST /website/blog/9/_update
+{
+   "script" : "ctx._source.views+=1"
+}
+
+# 新方式，文档不存在则先创建文档后执行更新，文档存在则直接更新
+POST /website/pageviews/1/_update
+{
+   "script" : "ctx._source.views+=1",
+   "upsert": {
+       "views": 1
+   }
+}
+```
+
+- 更新冲突
+上述可知，更新文档时会先检索旧文档，基于旧文档来重新构建新文档。在检索和构建过程中，如果发生其他请求的更新，那么 `_version` 号将不匹配，更新请求将会失败。此时，很有必要引入失败重试的机制。
+
+```shell
+# 失败重试 5 次
+POST /website/blog/10/_update?retry_on_conflict=5
+{
+   "script" : "ctx._source.views+=1",
+   "upsert": {
+       "views": 1
+   }
+}
+```
+
+
+
