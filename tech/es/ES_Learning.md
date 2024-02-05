@@ -764,6 +764,8 @@ POST /website/pageviews/1/_update
 - 更新冲突
 上述可知，更新文档时会先检索旧文档，基于旧文档来重新构建新文档。在检索和构建过程中，如果发生其他请求的更新，那么 `_version` 号将不匹配，更新请求将会失败。此时，很有必要引入失败重试的机制。
 
+Todo : 加上版本号控制?
+
 ```shell
 # 失败重试 5 次
 POST /website/blog/10/_update?retry_on_conflict=5
@@ -774,6 +776,209 @@ POST /website/blog/10/_update?retry_on_conflict=5
    }
 }
 ```
+##### 文档批量操作
+> `_mget`
 
+`_mget` API 使用一个 `docs` 数组作为参数，每个元素可以包含需要检索文档的元数据，包括 `_index`，`_type`，`_id`，同时可以通过 `_source` 来检索指定的字段。
+
+值得注意是：必须指定  `_index`，`_id` 字段，返回响应数据结构和请求的接口是一一对应的（与执行多个 GET 请求的效果一致），即使检索不到对应的文档。
+```shell
+# 请求方式 1
+GET /_mget
+{
+    "docs": [
+        {
+            "_index": "website",
+            "_type": "blog",
+            "_id": 1
+        },
+        {
+            "_index": "website",
+            "_type": "blog",
+            "_id": 120,
+            "_source": [
+                "title",
+                "text"
+            ]
+        }
+    ]
+}
+
+# 请求方式 2
+GET /website/blog/_mget
+{
+  "docs":[
+    {"_id":1},
+    {
+      "_id":120,
+      "_source":"title"
+    }
+  ]
+}
+
+# 请求方式 3
+GET /website/blog/_mget
+{
+  "ids":[1, 120]
+}
+```
+
+**NOTE:**   
+即使有某个文档没有找到，上述请求的 HTTP 状态码仍然是 `200` 。事实上，即使请求 _没有_ 找到任何文档，它的状态码依然是 `200` --因为 `mget` 请求本身已经成功执行。 为了确定某个文档查找是成功或者失败，你需要检查 `found` 标记。
+
+思考：这里节省的资源是合并请求，减少来回网络的消耗，ES 内部还是一个个文档去检索？
+
+##### 批量执行命令
+`_mget` 是执行相同的 query 命令返回多行数据。ES 也提供批量执行命令 API `_bulk`。比如，在单个步骤中进行多次的 `create` 、`index`、`update` 或 `delete` 命令请求。 
+
+格式要求：
+1.  JSON 只能放在同一行，每行一定要以**换行符（`\n`）隔开**。
+2. 行内不能包含**未转义的换行符**，他们对解析造成干扰，意味着也不能用 pretty 进行格式化。
+
+```shell
+POST /_bulk
+{ action: { metadata }}\n
+{ request body        }\n
+{ action: { metadata }}\n
+{ request body        }\n
+```
+
+`action` 可以使用的命令:
+- `create`：存在则报错，不存在则创建
+- `index`：索引一个文档，存在着更新
+- `update`：更新一个文档
+- `delete`：删除一个文档
+
+`metadata` 可以使用的命令：索引、创建、更新或者删除的文档的 `_index` 、 `_type` 和 `_id` 。
+
+- 示例 1
+`delete` 操作可以不加 request body。
+
+```shell
+POST /_bulk
+{"delete":{"_index":"website","_type":"blog","_id":3}}
+{"index":{"_index":"website","_type":"blog","_id":3}}
+{"title":"My first blog entry 3","text":"Just trying this out... 3","date":"2014/01/01"}
+```
+- 示例 2
+`update` 亦可以使用 `doc` 、 `upsert` 、 `script` 等等指令。
+
+```shell
+POST /_bulk
+{"create":{"_index":"website","_type":"blog","_id":5}}
+{"title":"My first blog entry 5","text":"Just trying this out... 5","date":"2014/01/01","views":0}
+{"update":{"_index":"website","_type":"blog","_id":5}}
+{"script":"ctx._source.views++"}
+
+
+POST /_bulk
+{ "delete": { "_index": "website", "_type": "blog", "_id": "123" }} 
+{ "create": { "_index": "website", "_type": "blog", "_id": "123" }}
+{ "title":    "My first blog post" }
+{ "index":  { "_index": "website", "_type": "blog" }}
+{ "title":    "My second blog post" }
+{ "update": { "_index": "website", "_type": "blog", "_id": "123", "_retry_on_conflict" : 3} }
+{ "doc" : {"title" : "My updated blog post"} }
+```
+
+- 示例 3
+可以不指定 `_index` 和 `_type` 的方式来请求，通过 url 来指定。
+```shell
+POST /website/_bulk
+{ "delete": {"_type": "blog", "_id": "124" }} 
+{ "create": {"_type": "blog", "_id": "124" }}
+{ "title":    "My first blog post => to 124" }
+```
+
+
+- 返回示例 
+如下可以看到，每个命令都可以执行成功，`errors == false`，如果有一命令执行失败，则 `errors == true` ，对应的请求体有响应的失败信息。 
+
+**NOTE：** 这里的 `_bulk` 命令也是相当于批量发送指令到 ES，由 ES 一条条执行。其请求不是原子性的，不能用它来实现事务控制。每个请求都是单独处理的，其中一个请求的成功或失败不会影响到其他的请求。 
+
+```shell
+{
+  "took" : 21,
+  "errors" : false,
+  "items" : [
+    {
+      "delete" : {
+        "_index" : "website",
+        "_type" : "blog",
+        "_id" : "123",
+        "_version" : 4,
+        "result" : "deleted",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 2,
+          "failed" : 0
+        },
+        "_seq_no" : 83,
+        "_primary_term" : 2,
+        "status" : 200
+      }
+    },
+    {
+      "create" : {
+        "_index" : "website",
+        "_type" : "blog",
+        "_id" : "123",
+        "_version" : 5,
+        "result" : "created",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 2,
+          "failed" : 0
+        },
+        "_seq_no" : 84,
+        "_primary_term" : 2,
+        "status" : 201
+      }
+    },
+    {
+      "index" : {
+        "_index" : "website",
+        "_type" : "blog",
+        "_id" : "eqEueI0BLrSyDrPbI8p5",
+        "_version" : 1,
+        "result" : "created",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 2,
+          "failed" : 0
+        },
+        "_seq_no" : 85,
+        "_primary_term" : 2,
+        "status" : 201
+      }
+    },
+    {
+      "update" : {
+        "_index" : "website",
+        "_type" : "blog",
+        "_id" : "123",
+        "_version" : 6,
+        "result" : "updated",
+        "_shards" : {
+          "total" : 2,
+          "successful" : 2,
+          "failed" : 0
+        },
+        "_seq_no" : 86,
+        "_primary_term" : 2,
+        "status" : 200
+      }
+    }
+  ]
+}
+```
+
+> 批量请求体大小确定
+
+整个批量请求都需要由接收到请求的节点加载到内存中，因此该请求越大，其他请求所能获得的内存就越少。批量请求的大小有一个最佳值，大于这个值，性能将不再提升，甚至会下降。但是最佳值不是一个固定的值。它完全取决于硬件、文档的大小和复杂度、索引和搜索的负载的整体情况。
+
+幸运的是，很容易找到这个 _最佳点_ ：通过批量索引典型文档，并不断增加批量大小进行尝试。 当性能开始下降，那么你的批量大小就太大了。一个好的办法是开始时将 1,000 到 5,000 个文档作为一个批次, 如果你的文档非常大，那么就减少批量的文档个数。
+
+密切关注你的批量请求的物理大小往往非常有用，一千个 1KB 的文档是完全不同于一千个 1MB 文档所占的物理大小。 一个好的批量大小在开始处理后所占用的物理大小约为 5-15 MB。
 
 
