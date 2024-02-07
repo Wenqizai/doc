@@ -312,8 +312,18 @@ ES 天生技术是分布式，应用无需关注和管理多节点，ES 自身�
 ![[集群状态关系图.png|425]]
 
 
+##### 集群节点
+[Node | Elasticsearch Guide \[7.17\] | Elastic](https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-node.html)
+
+`master node`：只负责 master role，多个灾备，可设置仅参与选举投票 voting-only
+`data node`：负责存储 data
 
 
+
+**高可用集群 High availability (HA) clusters，要求至少有 3 个候选 master 节点，而且至少有 2 个不是 voting-only 角色的。**
+
+
+所有节点都可以成为： [coordinating nodes]( https://www.elastic.co/guide/en/elasticsearch/reference/7.17/modules-node.html#coordinating-node "Coordinating node")
 ##### 集群健康
 - 查看命令
 ```shell
@@ -410,17 +420,17 @@ PUT /blogs/_settings
 ![image-20240122233826989.png|375](https://s2.loli.net/2024/01/22/XHaiWIlbRBoyFJC.png)
 
 2. node-1 下线
-![image.png|375](https://s2.loli.net/2024/01/22/cHQmKT7hE3Pq1Sg.png)
+![image.png|600](https://s2.loli.net/2024/01/22/cHQmKT7hE3Pq1Sg.png)
 
 3. node-1 上线
-![image.png|375](https://s2.loli.net/2024/01/22/w4gvDCtNbUi9lf7.png)
+![image.png|400](https://s2.loli.net/2024/01/22/w4gvDCtNbUi9lf7.png)
 
-### 数据输入和输出
+#### 数据输入和输出
 ES 是分布式的文档存储，能够存储和检索复杂的数据结构，序列化成 JSON 文档，以实时的方式。一旦一个文档被存储到 ES，它就可以被集群中的任意节点检索到。
 
 存储文档是一个方面，更重要的是我们需要查询这些文档，以特定的查询条件，批量且快速地查找到它们。在 ES 中，每个字段的所有数据数据都是默认被索引的，即每个字段都有为了快速检索设置的专用倒排索引。
 
-#### 文档
+##### 文档
 简单来说，文档就是一个个存储到 ES 的 JSON 对象，并且有唯一指定的 ID。
 ##### 文档元数据
 元数据，包含文档的相关信息，主要有如下的三个元素：
@@ -981,4 +991,61 @@ POST /website/_bulk
 
 密切关注你的批量请求的物理大小往往非常有用，一千个 1KB 的文档是完全不同于一千个 1MB 文档所占的物理大小。 一个好的批量大小在开始处理后所占用的物理大小约为 5-15 MB。
 
+#### 分布式存储
+当索引文档时，文档会被分发到集群中存储起来。查询文档时，又会从集群中查找。这些技术实现均由 ES 来完成。
+##### 存储文档 
+问题 => *索引一个文档时，文档被分发到某一个主分片进行存储。如果有多个主分片时，那么文档应该选择哪个分片来存储呢？*
 
+实际上存储和查找都是一样的道理，都要指定路由到指定的分片来执行。ES 采用 Hash 路由的方式（注意倾斜问题喔）。遵循公式：
+<font color="#e36c09"><center>shard = hash(routing) % number_of_primary_shards</center></font>
+
+`shard`：主分片的索引，范围 [0, number_of_primary_shards - 1]；
+`routing`：路由的键，可变值，ES 默认使用文档的 `_id`，亦可自定义；
+`number_of_primary_shards`：主分片的数量，创建索引时已经确定下来，副本分片可调整数量。
+
+**Note：** 为什么需要在创建索引时要确定分片数量，不可修改。因为 ES 要根据这个 Hash 路由来检索数据，如果分片数改变了，之前的确定的路由值对不上，也就查找不到原来的文档了。那么需要扩容怎么办？参看：[扩容设计 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/scale.html)
+
+所以也就解析了这些 API （ `get` 、 `index` 、 `delete` 、 `bulk` 、 `update` 以及 `mget`）都需要指定的 `_id`，因为这是提供 ES 需要的路由参数 `routing`。
+##### 主副分片同步
+假设存储索引的集群有 3 个节点，Master、NODE 2、NODE 3，如下图。
+
+![[集群节点图.png|500]]
+
+检索文档时，可以请求到集群中任意一个节点，每个节点都有能力处理请求。每个节点都知道集群中任一文档位置，所以可以直接将请求转发到需要的节点上。如果我们将所有的请求发送到 `Node 1` ，我们将其称为 _协调节点(coordinating node)_ 。
+
+**Note：** 为了负载均衡，发送请求时更好的做法是轮询集群中所有的节点。不同节点，承担的功能也不尽相同，可参考：[[ES_Learning#集群节点]]
+
+>新建、索引、删除
+
+新建文档、索引文档、删除文档，这些请求都是些操作，均由主分片完成，之后复制给副分片。示意图如下：
+
+![[集群分片同步文档.png|500]]
+
+以下是在主副分片和任何副本分片上面成功新建，索引和删除文档所需要的步骤顺序：
+
+1. 客户端向 `Node 1` 发送新建、索引或者删除请求。
+2. 节点使用文档的 `_id` 确定文档属于分片 0 。请求会被转发到 `Node 3`，因为分片 0 的主分片目前被分配在 `Node 3` 上。
+3. `Node 3` 在主分片上面执行请求。如果成功了，它将请求并行转发到 `Node 1` 和 `Node 2` 的副本分片上。一旦所有的副本分片都报告成功, `Node 3` 将向协调节点报告成功，协调节点向客户端报告成功。
+
+> 复制、同步策略
+- consistency 一致性
+当执行一个写操作请求时，这份写入的数据必须满足*规定数量（quorum）* 分片数处于活跃可用状态时（包括主分片和副分片），才允许本次请求的写入。这也是为了避免发生网络分区故障（network partition）、主从切换时数据一致性的要求：
+<font color="#e36c09"><center>规定数量 quorum = int ((primary + number_of_replicas) / 2 + 1)</center></font>
+consistency 设置为 `one`：只要主分片状态可用就行；
+consistency 设置为 `all`：必须所有的主分片和副分片都处于可用状态；
+consistency 设置为 `quorum`：默认值，满足上述公式，即大多数的分片副本状态没问题，当 `number_of_replicas > 1` 时才生效。
+
+举个例子：假设设置 1 主 3 副本的分片架构，一致性策略使用默认值 `quorum`。即集群中必须需要
+`可用分片数 = ((1 + 3 replicas)) / 2 + 1 = 3`。假如集群中只有 2 个分片可用时，将会无法索引和删除任何文档。 
+
+**注意：** quorum 计算时是集群中所有的主分片参与计算。判断分片数是否满足 quorum 数量时，用的分片数是对应请求的主分片+其副本分片的数量（不是集群中所有分片的数量）。
+
+写入时，指定参数
+``` shell
+PUT /{index}/{type}/{id}?consistency=quorum
+```
+
+- timeout
+如果没有足够可用的分片数时，ES 会等待一段时间，默认最多等待 1 分钟。亦可以设置 `timeout` 参数，在指定时间内结束请求。
+
+**Note：**  新索引默认有 `1` 个副本分片，这意味着为满足 `规定数量` _应该_ 需要两个活动的分片副本。但是，这些默认的设置会阻止我们在单一节点上做任何事情。为了避免这个问题，要求只有当 `number_of_replicas` 大于1的时候，规定数量才会执行。因为限制主分片和副本分片不能在同一个 Node，单节点启动是，节点只有主分片没有副分片。
