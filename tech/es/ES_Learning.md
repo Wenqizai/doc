@@ -68,6 +68,141 @@ PUT /website/blog/1/_create
 
 
 ```
+##### 搜索
+
+```shell
+DELETE /us
+DELETE /gb
+
+
+PUT /us/
+{
+   "settings" : {
+      "number_of_shards" : 3,
+      "number_of_replicas" : 1
+   }
+}
+
+PUT /gb/
+{
+   "settings" : {
+      "number_of_shards" : 3,
+      "number_of_replicas" : 1
+   }
+}
+
+
+PUT /us/tweet/1
+{
+  "type":"user",
+   "email" : "john@smith.com",
+   "name" : "John Smith",
+   "tweetname" : "@john"
+}
+
+PUT /gb/tweet/2
+{
+  "type":"user",
+   "email" : "mary@jones.com",
+   "name" : "Mary Jones",
+   "tweetname" : "@mary"
+}
+
+PUT /gb/tweet/3
+{
+   "date" : "2014-09-13",
+   "name" : "Mary Jones",
+   "tweet" : "Elasticsearch means full text search has never been so easy",
+   "tweet_id" : 2
+}
+
+PUT /us/tweet/4
+{
+   "date" : "2014-09-14",
+   "name" : "John Smith",
+   "tweet" : "@mary it is not just text, it does everything",
+   "tweet_id" : 1
+}
+
+PUT /gb/tweet/5
+{
+   "date" : "2014-09-15",
+   "name" : "Mary Jones",
+   "tweet" : "However did I manage before Elasticsearch?",
+   "tweet_id" : 2
+}
+
+PUT /us/tweet/6
+{
+   "date" : "2014-09-16",
+   "name" : "John Smith",
+   "tweet" : "The Elasticsearch API is really easy to use",
+   "tweet_id" : 1
+}
+
+PUT /gb/tweet/7
+{
+   "date" : "2014-09-17",
+   "name" : "Mary Jones",
+   "tweet" : "The Query DSL is really powerful and flexible",
+   "tweet_id" : 2
+}
+
+PUT /us/tweet/8
+{
+   "date" : "2014-09-18",
+   "name" : "John Smith",
+   "tweet_id" : 1
+}
+
+PUT /gb/tweet/9
+{
+   "date" : "2014-09-19",
+   "name" : "Mary Jones",
+   "tweet" : "Geo-location aggregations are really cool",
+   "tweet_id" : 2
+}
+
+PUT /us/tweet/10
+{
+   "date" : "2014-09-20",
+   "name" : "John Smith",
+   "tweet" : "Elasticsearch surely is one of the hottest new NoSQL products",
+   "tweet_id" : 1
+}
+
+PUT /gb/tweet/11
+{
+   "date" : "2014-09-21",
+   "name" : "Mary Jones",
+   "tweet" : "Elasticsearch is built for the cloud, easy to scale",
+   "tweet_id" : 2
+}
+
+PUT /us/tweet/12
+{
+   "date" : "2014-09-22",
+   "name" : "John Smith",
+   "tweet" : "Elasticsearch and I have left the honeymoon stage, and I still love her.",
+   "tweet_id" : 1
+}
+
+PUT /gb/tweet/13
+{
+   "date" : "2014-09-23",
+   "name" : "Mary Jones",
+   "tweet" : "So yes, I am an Elasticsearch fanboy",
+   "tweet_id" : 2
+}
+
+PUT /us/tweet/14
+{
+   "date" : "2014-09-24",
+   "name" : "John Smith",
+   "tweet" : "How many more cheesy tweets do I have to write?",
+   "tweet_id" : 1
+}
+```
 
 ### 名词解析
 
@@ -124,6 +259,17 @@ GET /megacorp/employee/1
   }
 }
 ```
+
+#### 搜索
+- 映射 Mapping
+描述数据在每个字段内如何存储
+
+- 分析 Analysis
+全文是如何处理使之可以被搜索
+
+- 领域特定查询语言 Query DSL
+ES 中强大灵活的查询语言
+
 
 ### 1. 入门
 #### Quick Start
@@ -1127,4 +1273,55 @@ PUT /{index}/{type}/{id}?consistency=quorum
 解析为什么 `_bulk` 指令使用的 JSON 格式跟 `_mget` 指令不一样。主要出于性能和内存的考量。
 [多文档模式 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/distrib-multi-doc.html)
 
+#### 搜索
+ES 提供的搜索（search）功能：
+1. 类似于 `gender` 或者 `age` 这样的字段上使用结构化查询，`join_date` 这样的字段上使用排序，就像 SQL 的结构化查询一样。
+2. 全文检索，找出所有匹配关键字的文档并按照_相关性（relevance）_ 排序后返回结果。
 
+>特定名词
+
+**映射 Mapping**：描述数据在每个字段内如何存储；
+**分析 Analysis**：全文是如何处理使之可以被搜索；
+**Query DSL**：领域特定查询语言 Query DSL，ES 中强大灵活的查询语言。
+
+#### 搜索结果
+> Hits
+
+- **total**：表示匹配到文档总数
+- **hits：** 数组，包含查询结构的前十个文档
+- 
+
+
+```shell
+# 空搜索请求，查询所有索引
+GET _search
+
+# 返回
+{
+   "hits" : {
+      "total" :       14,
+      "hits" : [
+        {
+          "_index":   "us",
+          "_type":    "tweet",
+          "_id":      "7",
+          "_score":   1,
+          "_source": {
+             "date":    "2014-09-17",
+             "name":    "John Smith",
+             "tweet":   "The Query DSL is really powerful and flexible",
+             "user_id": 2
+          }
+       }
+      ],
+      "max_score" :   1
+   },
+   "took" :           4,
+   "_shards" : {
+      "failed" :      0,
+      "successful" :  10,
+      "total" :       10
+   },
+   "timed_out" :      false
+}
+```
