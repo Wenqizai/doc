@@ -1444,3 +1444,71 @@ GET /_search?q=mary
 最后，查询字符串搜索允许任何用户在索引的任意字段上执行可能较慢且重量级的查询，这可能会暴露隐私信息，甚至将集群拖垮。
 
 **WARNING：** 因为这些原因，不推荐直接向用户暴露查询字符串搜索功能，除非对于集群和数据来说非常信任他们。
+
+#### 映射与分析
+##### 精确值&全文
+看的迷迷糊糊的：
+[精确值 VS 全文 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/_exact_values_versus_full_text.html)
+
+##### 倒排索引
+建立倒排索引时，要进行分词和标准化，否则查询时可能因为字段大小写、复数等问题导致结果匹配不上。
+
+[倒排索引 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/inverted-index.html)
+
+##### 分词与分词器
+分词的过程：
+1. 首先，将一块文本分成适合于倒排索引的独立的*词条*。
+2. 然后，将这些词条统一化为标准格式以提高他们的*可搜索性*，或者 *recall*。
+
+分词过程由分词器来执行，分词器主要封装了以下 3 个功能。
+> 字符过滤器
+
+The first，字符串按顺序通过每个*字符过滤器*，他们的任务是在分词前整理字符串。一个字符过滤器可以用来去掉HTML，或者将 `&` 转化成 `and`。
+
+> 分词器
+
+Then，字符串被 _分词器_ 分为单个的词条。一个简单的分词器遇到空格和标点的时候，可能会将文本拆分成词条。
+
+> Token 过滤器
+
+ Finally，词条按顺序通过每个 _token 过滤器_ 。这个过程可能会改变词条（例如，小写化 `Quick` ），删除词条（例如，像 `a`， `and`， `the` 等无用词），或者增加词条（例如，像 `jump` 和 `leap` 这种同义词）。
+
+###### 内置分词器
+ES 提供一些内置分词器，以下使用一个例子来解析不通分词器的作用：
+```txt
+"Set the shape to semi-transparent by calling set_trans(5)"
+```
+
+> 标准分词器
+
+默认使用的分词器，它根据 [Unicode 联盟](http://www.unicode.org/reports/tr29/) 定义的 _单词边界_ 划分文本。删除绝大部分标点。最后，将词条小写。
+
+```txt
+set, the, shape, to, semi, transparent, by, calling, set_trans, 5
+```
+
+> 简单分词器
+
+在任何不是字母的地方分隔文本，将词条小写。可以看到，对比标准分词器过滤掉的数字 5。
+
+```txt
+set, the, shape, to, semi, transparent, by, calling, set, trans
+```
+
+>空格分词器
+
+在空格的地方划分文本。
+
+```txt
+Set, the, shape, to, semi-transparent, by, calling, set_trans(5)
+```
+
+> 语言分词器
+
+特定语言有特定的语言特点，比如 `英语分词器` 可过滤掉一些无用词（比如，常用单词 and 和 the，这些对相关性没有多少影响的词）。此外这个分词器可以提取英语单次的*词干*。
+
+注意 `transparent`、 `calling` 和 `set_trans` 已经变为词根格式。
+
+```txt
+set, shape, semi, transpar, call, set_tran, 5
+```
