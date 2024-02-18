@@ -1512,3 +1512,73 @@ Set, the, shape, to, semi-transparent, by, calling, set_trans(5)
 ```txt
 set, shape, semi, transpar, call, set_tran, 5
 ```
+###### 使用分词器
+当索引一个文档时，文档的全文域会被分析成词条来创建倒排索引。因此，当在检索文档进行全文域搜索时，我们也需要将查询的字符串通过*相同分析过程*，以保证我们搜索的词条格式与索引中的词条格式一致。
+
+区分精确值和全文查询：
+- 全文查询：当查询一个*全文*域时，会对查询字符串引用相同的分析器，易产生正确的搜索词条列表；
+- 精确值：当查询一个*精确值*域，不会分析查询字符串，而是搜索指定的精确值。
+
+对于以下的查询得到不同的查询结果，这时因为数据在 `_all` 字段与 `date` 字段的索引方式不同。
+- `date` 域包含一个精确值：单独的词条 `2014-09-15`。
+- `_all` 域是一个全文域，所以分词进程将日期转化为三个词条： `2014`， `09`，和 `15`。
+
+```shell
+GET /_search?q=2014              # 12 results
+GET /_search?q=2014-09-15        # 12 results ! (使用 `_all` 字段查询，先分词成2014、09、15，然后执行查询)
+GET /_search?q=date:2014-09-15   # 1  result (`date`类型域精确值查询)
+GET /_search?q=date:2014         # 0  results !
+```
+###### 测试分词效果
+实际过程中，我们需要确定文本被分词后，存储到倒排索引的词条。此时，需要借助 `analyze` API 来看文本如何被分词的。
+
+```shell
+# 请求
+GET /_analyze
+{
+  "analyzer": "standard",
+  "text": "Text to analyze"
+}
+
+# 返回
+{
+  "tokens" : [
+    {
+      "token" : "text",
+      "start_offset" : 0,
+      "end_offset" : 4,
+      "type" : "<ALPHANUM>",
+      "position" : 0
+    },
+    {
+      "token" : "to",
+      "start_offset" : 5,
+      "end_offset" : 7,
+      "type" : "<ALPHANUM>",
+      "position" : 1
+    },
+    {
+      "token" : "analyze",
+      "start_offset" : 8,
+      "end_offset" : 15,
+      "type" : "<ALPHANUM>",
+      "position" : 2
+    }
+  ]
+}
+```
+
+-  `token` ：实际存储到索引中的词条；
+- `position`：指词条在原始文本中出现的位置；
+- `start_offset` 和 `end_offset`：字符在原始字符串中的位置。
+
+**TIP**：每个分析器的 `type` 值都不一样，可以忽略它们。它们在Elasticsearch中的唯一作用在于​[`keep_types` token 过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-keep-types-tokenfilter.html)​。
+###### 指定分析器
+当Elasticsearch在你的文档中检测到一个新的字符串域，它会自动设置其为一个全文 `字符串` 域，使用 `标准` 分析器对它进行分析。
+
+你不希望总是这样。可能你想使用一个不同的分析器，适用于你的数据使用的语言。有时候你想要一个字符串域就是一个字符串域—​不使用分析，直接索引你传入的精确值，例如用户ID或者一个内部的状态域或标签。
+
+要做到这一点，我们必须手动指定这些域的映射。
+
+
+
