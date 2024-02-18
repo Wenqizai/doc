@@ -15,6 +15,13 @@ es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.c
 
 ES 深度分页的实践： [Elasticsearch Deep Pagination - Wojik](https://kwojcicki.github.io/blog/ES-PAGINATION)
 
+> 映射
+
+[一文搞懂 Elasticsearch 之 Mapping - 武培轩 - 博客园](https://www.cnblogs.com/wupeixuan/p/12514843.html)
+[Elasticsearch 空值处理实战指南-腾讯云开发者社区-腾讯云]( https://cloud.tencent.com/developer/article/1749469 )
+[如何在es中查询null值或者不存在的字段-duidaima 堆代码](https://www.duidaima.com/Group/Topic/OtherWeb/9396)
+[null\_value | Elasticsearch Guide \[8.12\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/reference/current/null-value.html )
+[Dealing with Null Values | Elasticsearch: The Definitive Guide \[2. X\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/guide/2.x/_dealing_with_null_values.html#_exists_query )
 ### 材料准备
 
 #### 1.  入门
@@ -1445,7 +1452,7 @@ GET /_search?q=mary
 
 **WARNING：** 因为这些原因，不推荐直接向用户暴露查询字符串搜索功能，除非对于集群和数据来说非常信任他们。
 
-#### 映射与分析
+#### 映射与分词
 ##### 精确值&全文
 看的迷迷糊糊的：
 [精确值 VS 全文 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/_exact_values_versus_full_text.html)
@@ -1573,12 +1580,262 @@ GET /_analyze
 - `start_offset` 和 `end_offset`：字符在原始字符串中的位置。
 
 **TIP**：每个分析器的 `type` 值都不一样，可以忽略它们。它们在Elasticsearch中的唯一作用在于​[`keep_types` token 过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-keep-types-tokenfilter.html)​。
-###### 指定分析器
+###### 指定分词器
 当Elasticsearch在你的文档中检测到一个新的字符串域，它会自动设置其为一个全文 `字符串` 域，使用 `标准` 分析器对它进行分析。
 
 你不希望总是这样。可能你想使用一个不同的分析器，适用于你的数据使用的语言。有时候你想要一个字符串域就是一个字符串域—​不使用分析，直接索引你传入的精确值，例如用户ID或者一个内部的状态域或标签。
 
 要做到这一点，我们必须手动指定这些域的映射。
 
+##### 映射
+ES 将数据类型都定义在映射 `Mapping` 中，如时间域视为时间，数字域视为数字，字符串域视为全文或精确值字符串。
+
+###### 核心简单域类型
+ES 支持如下简单域类型，ES 使用语言类型是 Java ，所以支持的数据类型基本也是与 Java 类型一致，只不过是小写形式。
+
+- `type`
+
+| 类型 | ES 类型 |
+| ---- | ---- |
+| 字符串 | string/text |
+| 整数 | byte， short， integer， long |
+| 浮点数 | float，double |
+| 布尔类型 | boolean |
+| 日期 | date |
+当索引一个文档时，如果该域没有在 `Mapping` 定义过，ES 会采用 [_动态映射_]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/dynamic-mapping.html "动态映射")，通过 JSON 中的数据，尝试猜测域的类型，规则如下：
+
+| JSON Type | ES Type |
+| ---- | ---- |
+| 布尔类型：true 或 false | boolean |
+| 整数：123 | long |
+| 浮点数：123.45 | double |
+| 字符串，有效日期：2014-09-15 | date |
+| 字符串：foo bar | string/text |
+**NOTE：** 这意味着如果你通过引号( `"123"` )索引一个数字，它会被映射为 `string` 类型，而不是 `long` 。但是，如果这个域已经映射为 `long` ，那么 Elasticsearch 会尝试将这个字符串转化为 long ，如果无法转化，则抛出一个异常。
+
+###### 操作映射
+> 查询映射
+
+通过 `/_mapping` API 查询。
+```shell
+GET /{index}/_mapping
+```
+
+> 自定义映射
+
+尽管在很多情况下基本域数据类型已经够用，但你经常需要为单独域自定义映射，特别是字符串域。自定义映射允许你执行下面的操作：
+
+- 全文字符串域和精确值字符串域的区别
+- 使用特定语言分析器
+- 优化域以适应部分匹配
+- 指定自定义数据格式
+- 还有更多
+
+**TIP：** 高效自定义映射，索引一个全新文档，利用动态映射生成映射信息，修改映射，删除索引，建立自定义映射。
+
+> 映射指定类型
+
+- `index`：属性控制怎样索引字符串
+	- es 7 之前
+		- `analyzed` 首先分析字符串，然后索引它。换句话说，以全文索引这个域。
+		- `not_analyzed`  索引这个域，所以它能够被搜索，但索引的是精确值。不会对它进行分析。 
+		- `no` 不索引这个域。这个域不会被搜索到。
+	- es 7 之后
+		- true
+		- false 
+		- 指定 `type` 类型是 `text` 还是 `keyword`，代替 `analyzed` 和 `not_analyzed`。
+
+ES 7.0 之后映射类型已经改动很大了，建议还是看回相关的文档。
+
+- `analyzed`：指定在搜索和索引时使用的分词器。 
+
+```json
+{
+    "tweet": {
+        "type":     "string",
+        "analyzer": "english"
+    }
+}
+```
+
+> 创建映射
+
+创建一个新索引 `gb`，指定 `tweet` 域使用 `english` 分词器。如下，可以在请求体中指定 `mappings` 字段来创建新的映射。
+
+```shell
+PUT /gb 
+{
+  "mappings": {
+    "tweet" : {
+      "properties" : {
+        "tweet" : {
+          "type" :    "string",
+          "analyzer": "english"
+        },
+        "date" : {
+          "type" :   "date"
+        },
+        "name" : {
+          "type" :   "string"
+        },
+        "user_id" : {
+          "type" :   "long"
+        }
+      }
+    }
+  }
+}
+```
+
+对已有索引添加映射，在 `tweet` 映射增加一个新的名为 `tag` 的 `not_analyzed` 的文本域，使用 `_mapping` 。
+
+```shell
+PUT /gb/_mapping/tweet
+{
+  "properties" : {
+    "tag" : {
+      "type" :    "string",
+      "index":    "not_analyzed"
+    }
+  }
+}
+```
+
+  
+**NOTE：** 尽管你可以 _增加_ 一个存在的映射，你不能 _修改_ 存在的域映射。如果一个域的映射已经存在，那么该域的数据可能已经被索引。如果你意图修改这个域的映射，索引的数据可能会出错，不能被正常的搜索。
+###### 测试映射
+使用 `analyze` API 测试字符串域的映射。
+
+```shell
+# tweet 的 type 是 text
+GET /gb/_analyze
+{
+  "field": "tweet",
+  "text": "Black-cats"
+}
+
+# # tweet 的 type 是 keyword
+GET /gb/_analyze
+{
+  "field": "tag",
+  "text": "Black-cats"
+}
+```
+
+`tweet` 域产生两个词条 `black` 和 `cat` ， `tag` 域产生单独的词条 `Black-cats` 。换句话说，我们的映射正常工作。
+
+###### 复杂核心域类型
+除了简单域数据类型， JSON 还有 `null` 值，数组，和对象，这些 ES 也有对应的支持。
+
+> 多值域
+
+数组类型，_数组中所有的值必须是相同数据类型的_ 。ES 会选择数组中第一个值的数据类型来定义这个数组域的类型 `type`。
+
+```json
+{ "tag": [ "search", "nosql" ]}
+```
 
 
+**NOTE：** ES 检索文档时，返回的  `_source` 里面的数组，顺序和索引文档时是一致的。但数组的值也可以建立倒排索引，能够被检索。但是值得注意是，检索数组的值时不能指定值的位置检索。因此在搜索的时候，你不能指定 “第一个” 或者 “最后一个”是什么值来检索。
+
+> 空域
+
+在 Lucene 中是不能存储 `null` 值的，所以我们认为存在 `null` 值的域为空域。
+
+[Elasticsearch 空值处理实战指南-腾讯云开发者社区-腾讯云](https://cloud.tencent.com/developer/article/1749469)
+[如何在es中查询null值或者不存在的字段-duidaima 堆代码](https://www.duidaima.com/Group/Topic/OtherWeb/9396)
+[null\_value | Elasticsearch Guide \[8.12\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/reference/current/null-value.html )
+[Dealing with Null Values | Elasticsearch: The Definitive Guide \[2.x\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/guide/2.x/_dealing_with_null_values.html#_exists_query )
+
+> 多层级对象
+
+ES 支持对象中嵌入多个实体对象，如下所示：
+
+```json
+{
+    "tweet":            "Elasticsearch is very flexible",
+    "user": {
+        "id":           "@johnsmith",
+        "gender":       "male",
+        "age":          26,
+        "name": {
+            "full":     "John Smith",
+            "first":    "John",
+            "last":     "Smith"
+        }
+    }
+}
+```
+
+对应嵌套对象的映射：
+
+```json
+{
+  "gb": {
+    "tweet": { 
+      "properties": {
+        "tweet":            { "type": "string" },
+        "user":
+          "type":             "object",  # 新版本没有这个了
+          "properties": {
+            "id":           { "type": "string" },
+            "gender":       { "type": "string" },
+            "age":          { "type": "long"   },
+            "name":   {
+              "type":         "object",  # 新版本没有这个了
+              "properties": {
+                "full":     { "type": "string" },
+                "first":    { "type": "string" },
+                "last":     { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+嵌套对象的倒排索引
+
+Lucene 不理解内部对象。 Lucene 文档是由一组键值对列表组成的。为了能让 Elasticsearch 有效地索引内部类，它把我们的文档转化成这样：
+
+```json
+{
+    "tweet":            [elasticsearch, flexible, very],
+    "user.id":          [@johnsmith],
+    "user.gender":      [male],
+    "user.age":         [26],
+    "user.name.full":   [john, smith],
+    "user.name.first":  [john],
+    "user.name.last":   [smith]
+}
+```
+
+**NOTE：** 在前面简单扁平的文档中，没有 `user` 和 `user.name` 域。Lucene 索引只有标量和简单值，没有复杂数据结构。
+
+> 嵌套对象数组
+
+考虑包含内部对象的数组是如何被索引的。假设我们有个 `followers` 数组：
+
+```json
+{
+    "followers": [
+        { "age": 35, "name": "Mary White"},
+        { "age": 26, "name": "Alex Jones"},
+        { "age": 19, "name": "Lisa Smith"}
+    ]
+}
+```
+
+对应的倒排索引： 
+
+```json
+{
+    "followers.age":    [19, 26, 35],
+    "followers.name":   [alex, jones, lisa, smith, mary, white]
+}
+```
+
+由倒排索引可知，`{age: 35}` 和 `{name: Mary White}` 之间的相关性已经丢失了，因为每个多值域只是一包无序的值，而不是有序数组。
