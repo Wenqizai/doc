@@ -2082,3 +2082,102 @@ GET /_search
     }
 }
 ```
+
+###### 组合多查询
+
+高级查询：需要一种能够将多查询组合成单一查询的查询方法。`bool` 查询可以实现该高级查询。这种查询将多查询组合在一起，成为用户自己想要的布尔查询。其接收以下参数：
+
+- `must`：文档**必须**匹配这些调价才能被包含进来
+- `must_not`: 文档**必须不**匹配这些条件才能被包含进来
+- `should`：如果满足这些语句中的任意语句，将增加 `_score`，否则，无任何影响。它们主要用于修正每个文档的相关性得分。
+- `filter`：文档**必须**匹配，但它不参与评分，是以过滤模式来进行。这些语句对评分没有贡献，只是根据过滤标准来排除或包含文档。
+
+> 组合的相关性得分
+
+ 每个子查询都独立地计算文档的相关性得分。一旦它们的得分被计算出来，`bool` 查询就将这些得分进行合并，并且返回一个代表整个布尔操作的得分。
+
+如下查询：查找 `title` 字段匹配 `how to make millions` 并且不被标识为 `spam` 的文档。那些被标识为 `starred` 或在2014之后的文档，将比另外那些文档拥有更高的排名。如果 _两者_ 都满足，那么它排名将更高：
+
+```json
+{
+    "bool": {
+        "must":     { "match": { "title": "how to make millions" }},
+        "must_not": { "match": { "tag":   "spam" }},
+        "should": [
+            { "match": { "tag": "starred" }},
+            { "range": { "date": { "gte": "2014-01-01" }}}
+        ]
+    }
+}
+```
+
+**TIP：** 如果没有 `must` 语句，那么至少需要能够匹配其中的一条 `should` 语句。但，如果存在至少一条 `must` 语句，则对 `should` 语句的匹配没有要求。
+
+> 过滤器 filtering 查询
+
+如果我们不想因为文档的时间而影响到得分，可以用 `filter` 语句来重写前面的例子。
+此时 range 查询已经从 `should` 语句中移到 `filter` 语句。
+
+```json
+{
+    "bool": {
+        "must":     { "match": { "title": "how to make millions" }},
+        "must_not": { "match": { "tag":   "spam" }},
+        "should": [
+            { "match": { "tag": "starred" }}
+        ],
+        "filter": {
+          "range": { "date": { "gte": "2014-01-01" }}
+        }
+    }
+}
+```
+
+通过将 `range` 查询移到 `filter` 语句中，可以将它转成不评分的查询。**因此可以利用各种对 `filter` 查询有效的优化手段来提升性能。**
+
+所有查询都可以借鉴这种方式。将查询移到 `bool` 查询的 `filter` 语句中，这样它就自动的转成一个不评分的 filter 了。
+
+如果你需要通过多个不同的标准来过滤你的文档，`bool` 查询本身也可以被用做不评分的查询。简单地将它放置到 `filter` 语句中并在内部构建布尔逻辑。将 `bool` 查询包裹在 `filter` 语句中，我们可以在过滤标准中增加布尔逻辑。
+
+通过混合布尔查询，我们可以在我们的查询请求中灵活地编写 scoring 和 filtering 查询逻辑。
+
+```json
+{
+    "bool": {
+        "must":     { "match": { "title": "how to make millions" }},
+        "must_not": { "match": { "tag":   "spam" }},
+        "should": [
+            { "match": { "tag": "starred" }}
+        ],
+        "filter": {
+          "bool": { 
+              "must": [
+                  { "range": { "date": { "gte": "2014-01-01" }}},
+                  { "range": { "price": { "lte": 29.99 }}}
+              ],
+              "must_not": [
+                  { "term": { "category": "ebooks" }}
+              ]
+          }
+        }
+    }
+}
+```
+
+> `Constant_score` 查询
+
+constant_score 查询，相当使用没有那么频繁。它将一个不变的变量评分应用于所有匹配的文档。它被经常用于你只需要执行一个 filter 而没有其它查询（例如，评分查询）的情况下。
+
+可以使用它来取代只有 filter 语句的 `bool` 查询。在性能上是完全相同的，但对于提高查询简洁性和清晰度有很大帮助。
+
+`term ` 查询被放置在  `constant_score ` 中，转成不评分的 filter。这种方式可以用来取代只有 filter 语句的 `bool ` 查询。
+
+```json
+{
+    "constant_score":   {
+        "filter": {
+            "term": { "category": "ebooks" }
+        }
+    }
+}
+```
