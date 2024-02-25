@@ -1867,3 +1867,76 @@ GET /index_2014*/type1,type2/_search
 }
 ```
 
+###### 查询表达式 DSL
+查询表达式：Query DSL，可以只需讲查询语句传递给 query 参数.
+
+其中空查询（empty search）, 在功能上等价于使用 `match_all`。
+
+```shell
+GET _search
+{
+  "query": {
+    # 查询内容
+  }
+}
+```
+
+查询语句的结构
+
+```json
+{
+    QUERY_NAME: {
+        ARGUMENT: VALUE,
+        ARGUMENT: VALUE,...
+    }
+}
+
+# 使用 `match` 查询语句 来查询 `tweet` 字段中包含 `elasticsearch` 的 tweet：
+GET /_search
+{
+    "query": {
+        "match": {
+            "tweet": "elasticsearch"
+        }
+    }
+}
+```
+
+> 合并查询语句
+
+查询语句（Query clauses）就像一些简单的组合块，这些组合块可以批次之间合并组陈更加复杂的查询。语句的形式如下：
+
+- 叶子语句（Leaf clauses），就像 `match` 语句，用于讲查询字符串和一个字段，或多个字段对比。
+- 复合语句（Compound），主要用于合并其他查询语句。比如，一个 `bool` 语句，允许在需要的时候组合其他语句，无论是 `must` 匹配，`must_not` 匹配还是 `should` 匹配，同时亦可以包含不评分的过滤器（filters）。
+
+```json
+{
+    "bool": {
+        "must":     { "match": { "tweet": "elasticsearch" }},
+        "must_not": { "match": { "name":  "mary" }},
+        "should":   { "match": { "tweet": "full text" }},
+        "filter":   { "range": { "age" : { "gt" : 30 }} }
+    }
+}
+```
+
+一个复合语句可以合并任何其他的查询语句，包括复合语句。意味者，复合语句之间可以复现嵌套，表达非常复杂的逻辑。
+
+```json
+# 找出信件正文包含  `business opportunity` 的星标邮件，或者在收件箱正文包含 `business opportunity` 的非垃圾邮件：
+{
+    "bool": {
+        "must": { "match":   { "email": "business opportunity" }},
+        "should": [
+            { "match":       { "starred": true }},
+            { "bool": {
+                "must":      { "match": { "folder": "inbox" }},
+                "must_not":  { "match": { "spam": true }}
+            }}
+        ],
+        "minimum_should_match": 1
+    }
+}
+```
+
+一条复合语句可以将多条语句 — 叶子语句和其它复合语句 — 合并成一个单一的查询语句。
