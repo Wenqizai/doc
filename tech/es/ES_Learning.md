@@ -2181,3 +2181,68 @@ constant_score 查询，相当使用没有那么频繁。它将一个不变的�
     }
 }
 ```
+
+###### 验证查询
+
+查询可以变得非常复杂，理解起来有点困难，这时可以利用  `validate-query` API 可以用来验证查询是否合法。
+
+```shell
+# 这个语句是不合法的
+GET /gb/tweet/_validate/query
+{
+   "query": {
+      "tweet" : {
+         "match" : "really powerful"
+      }
+   }
+}
+```
+
+为了找出查询不合法的原因，可以将 `explain` 参数加到查询字符串中：
+
+```shell
+GET /gb/tweet/_validate/query?explain
+{
+   "query": {
+      "tweet" : {
+         "match" : "really powerful"
+      }
+   }
+}
+```
+
+
+对于合法查询，使用 `explain` 参数将返回可读的描述，这对准确理解 Elasticsearch 是如何解析你的 query 是非常有用的：
+
+```shell
+GET /_validate/query?explain
+{
+   "query": {
+      "match" : {
+         "tweet" : "really powerful"
+      }
+   }
+}
+```
+
+查询的每一个 index 都会返回对应的 `explanation` ，因为每一个 index 都有自己的映射和分析器。
+
+```json
+{
+  "valid" :         true,
+  "_shards" :       { ... },
+  "explanations" : [ {
+    "index" :       "us",
+    "valid" :       true,
+    "explanation" : "tweet:really tweet:powerful"
+  }, {
+    "index" :       "gb",
+    "valid" :       true,
+    "explanation" : "tweet:realli tweet:power"
+  } ]
+}
+```
+
+从 `explanation` 中可以看出，匹配 `really powerful` 的 `match` 查询被重写为两个针对 `tweet` 字段的 single-term 查询，一个 single-term 查询对应查询字符串分出来的一个 term。
+
+当然，对于索引 `us` ，这两个 term 分别是 `really` 和 `powerful` ，而对于索引 `gb` ，term 则分别是 `realli` 和 `power` 。之所以出现这个情况，是由于我们将索引 `gb` 中 `tweet` 字段的分析器修改为 `english` 分析器。
