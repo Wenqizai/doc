@@ -2513,4 +2513,66 @@ GET /_search
 
 实际上， “深分页” 很少符合人的行为。当2到3页过去以后，人会停止翻页，并且改变搜索标准。会不知疲倦地一页一页的获取网页直到你的服务崩溃的罪魁祸首一般是机器人或者web spider。
 
-如果你 _确实_ 需要从你的集群取回大量的文档，你可以通过用 `scroll` 查询禁用排序使这个取回行为更有效率，我们会在 [later in this chapter](https://www.elastic.co/guide/cn/elasticsearch/guide/current/scroll.html "游标查询 Scroll") 进行讨论。
+如果你 _确实_ 需要从你的集群取回大量的文档，你可以通过用 `scroll` 查询禁用排序使这个取回行为更有效率，我们会在 [later in this chapter]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/scroll.html "游标查询 Scroll") 进行讨论。
+
+
+###### 搜索选项
+
+ES 提供一些查询参数来影响搜索的过程，偏好，超时，路由，搜索类型。
+
+> 偏好
+
+偏好这个参数 `preference` 允许用来控制由哪些分片或节点来处理搜索请求。它接受像 `_primary`, `_primary_first`, `_local`, `_only_node:xyz`, `_prefer_node:xyz`, 和 `_shards:2,3` 这样的值, 这些值在 [search `preference`](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/search-request-preference.html) 文档页面被详细解释。
+
+但是最有用的值是某些随机字符串，它可以避免 _bouncing results_ 问题。
+
+**Bouncing Results**
+
+想象一下有两个文档有同样值的时间戳字段，搜索结果用 `timestamp` 字段来排序。 由于搜索请求是在所有有效的分片副本间轮询的，那就有可能发生主分片处理请求时，这两个文档是一种顺序， 而副本分片处理请求时又是另一种顺序。
+
+这就是所谓的 _bouncing results_ 问题: 每次用户刷新页面，搜索结果表现是不同的顺序。让同一个用户始终使用同一个分片，这样可以避免这种问题，可以设置 `preference` 参数为一个特定的任意值比如用户会话 ID 来解决。
+
+> 超时问题
+
+客户端响应请求的时间是所有分片检索后合并的时间。为了不让某一分片拖慢了整体的请求，可以使用超时时间来避免这类的问题。
+
+参数 `timeout` 告诉分片允许处理数据的最大时间。如果没有足够的时间处理所有数据，这个分片的结果可以是部分的，甚至是空数据。(**注意：这里的超时是基于分片的**)
+
+搜索的返回结果会用属性 `timed_out` 标明分片是否返回的是部分结果：
+
+```shell
+{
+	"timed_out":     true,
+}
+```
+
+
+  
+**WANRING：** 超时仍然是一个最有效的操作，知道这一点很重要；很可能查询会超过设定的超时时间。这种行为有两个原因：
+
+1. 超时检查是基于每文档做的。 但是某些查询类型有大量的工作在文档评估之前需要完成。 这种 "setup" 阶段并不考虑超时设置，所以太长的建立时间会导致超过超时时间的整体延迟。
+2. 因为时间检查是基于每个文档的，一次长时间查询在单个文档上执行并且在下个文档被评估之前不会超时。这也意味着差的脚本（比如带无限循环的脚本）将会永远执行下去。
+
+> 路由
+
+在 [路由一个文档到一个分片中]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/routing-value.html "路由一个文档到一个分片中") 中, 我们解释过如何定制参数 `routing` ，它能够在索引时提供来确保相关的文档，比如属于某个用户的文档被存储在某个分片上。在搜索的时候，不用搜索索引的所有分片，而是通过指定几个 `routing` 值来限定只搜索几个相关的分片：
+
+```shell
+GET /_search?routing=user_1,user2
+```
+
+> 搜索类型
+
+缺省的搜索类型是 `query_then_fetch` 。在某些情况下，你可能想明确设置 `search_type` 为 `dfs_query_then_fetch` 来改善相关性精确度：
+
+GET /_search?search_type=dfs_query_then_fetch
+
+搜索类型 `dfs_query_then_fetch` 有预查询阶段，这个阶段可以从所有相关分片获取词频来计算全局词频。我们在 [被破坏的相关度！]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/relevance-is-broken.html "被破坏的相关度！") 会再讨论它。
+
+###### 游标查询 Scroll
+
+`scroll` 查询可以用来对 Elasticsearch 有效地执行大批量的文档查询，而又不用付出深度分页那种代价。
+
+游标查询允许我们先做查询初始化，然后再批量地拉取结果。这有点儿像传统数据库中的 _cursor_ 。
+
+[游标查询 Scroll | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/scroll.html)
