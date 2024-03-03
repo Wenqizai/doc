@@ -2396,4 +2396,41 @@ Query-string 搜索也支持自定义排序，可以在查询字符串中使用�
 }
 ```
 
-**WARNING：**  以全文 `analyzed` 字段排序会消耗大量的内存。获取更多信息请看 [聚合与分析](https://www.elastic.co/guide/cn/elasticsearch/guide/current/aggregations-and-analysis.html "聚合与分析") 。
+**WARNING：**  以全文 `analyzed` 字段排序会消耗大量的内存。获取更多信息请看 [聚合与分析]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/aggregations-and-analysis.html "聚合与分析") 。
+
+###### 相关性
+
+查询语句会为每个文档生成一个 `_score` 字段。评分的计算方式取决于查询类型。不同的查询语句用于不同的目的： 
+
+- `fuzzy` 查询会计算与关键词的拼写相似程度；
+- `terms` 查询会计算找到的内容与关键词组成部分匹配的百分比。
+
+但是通常我们说的 _relevance_ 是我们用来计算全文本字段的值相对于全文本检索词相似程度的算法。ES 的相似度算法被定义为*检索词频率/反向文档频率*，TF/IDF。
+
+**检索词频率**
+
+检索词在该字段出现的频率。出现的频率越高，相关性也越高。字段中出现过 5 次要比只出现过 1 次的相关性高。
+
+**反向文档频率**
+
+每个检索词在索引中出现的频率。频率越高，相关性越低。检索词出现在多数文档中会比出现在少数文档中的权重更低。
+
+**字段长度准则**
+
+字段的长度，长度越长，相关性越低。检索词出现在一个短的 title 要比同样的词出现在一个长的 content 字段的权重更大。
+
+单个查询可以联合使用 TF/IDF 和其他方式，比如短语查询中检索词的距离或模糊查询里的检索词相似度。
+相关性并不只是全文本检索的专利。也适用于 yes|no 的子句，匹配的子句越多，相关性评分越高。
+如果多条查询子句被合并为一条复合查询语句，比如 bool 查询，则每个查询子句计算得出的评分会被合并到总的相关性评分中。
+
+###### 评分标准
+
+使用 `explain` 来获取详细的信息。具体查看：[什么是相关性? | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/relevance-intro.html)
+
+```shell
+GET /_search?explain=true&format=yaml
+{
+  "query": {"match" : {"tweet": "honeymoon"}}
+}
+```
+
