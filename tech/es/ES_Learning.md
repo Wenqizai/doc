@@ -2246,3 +2246,154 @@ GET /_validate/query?explain
 从 `explanation` 中可以看出，匹配 `really powerful` 的 `match` 查询被重写为两个针对 `tweet` 字段的 single-term 查询，一个 single-term 查询对应查询字符串分出来的一个 term。
 
 当然，对于索引 `us` ，这两个 term 分别是 `really` 和 `powerful` ，而对于索引 `gb` ，term 则分别是 `realli` 和 `power` 。之所以出现这个情况，是由于我们将索引 `gb` 中 `tweet` 字段的分析器修改为 `english` 分析器。
+
+##### 排序与相关性
+默认情况下，返回的结果都是按照**相关性**进行排序的，最相关的文档排在前面。
+
+###### 排序
+ES 通过一个浮点数来表示**相关性得分**，并通过搜索结果中字段 `_score` 来返回，默认排序是按 `_score` 建降序。
+
+有时，相关性评分可能对搜索结果是没有意义的，比如获取所有 user_id 等于 1 的结果。
+```shell
+GET /_search
+{
+    "query" : {
+        "bool" : {
+            "filter" : {
+                "term" : {
+                    "user_id" : 1
+                }
+            }
+        }
+    }
+}
+```
+
+这里没有一个有意义的分数：因为我们使用的是 filter （过滤），这表明我们只希望获取匹配 `user_id: 1` 的文档，并没有试图确定这些文档的相关性。实际上文档将按照随机顺序返回，并且每个文档都会评为零分。
+  
+如果评分为零对你造成了困扰，这里的查询使用了 `constant_score`，让所有的文档应用一个恒定的分数（默认为 1）。它将执行与前述查询相同的查询，并且所有的文档将像之前一样随机返回，这些文档只是有了一个分数而不是零分。
+
+```shell
+GET /_search
+{
+    "query" : {
+        "constant_score" : {
+            "filter" : {
+                "term" : {
+                    "user_id" : 1
+                }
+            }
+        }
+    }
+}
+```
+
+> 按字段的值排序
+
+使用 `sort` 参数，实现按时间来排序。你会发现 `max_score` 和 `_score` 字段都是返回 null，而 `sort` 返回一个时间戳。这是因为：
+1. `_score` : 不被计算，因为没有用于排序;
+2. `date`：字段的值表示自 epoch (January 1, 1970 00:00:00 UTC)以来的毫秒数，通过 `sort` 字段的值进行返回。
+
+```shell
+GET _search
+{
+  "query": {
+    "bool": {
+      "filter": {
+        "term": {
+          "tweet_id": "1"
+        }
+      }
+    }
+  },
+  "sort": [
+    {
+      "date": {
+        "order": "desc"
+      }
+    }
+  ]
+}
+```
+
+计算 `_score` 的花销巨大，通常仅用于排序；我们并不根据相关性排序，所以记录 `_score` 是没有意义的。如果无论如何你都要计算 `_score` ，你可以将 `track_scores` 参数设置为 `true` 。
+
+> 多级排序
+
+ `date` 和 `_score` 进行查询，并且匹配的结果首先按照日期排序，然后按照相关性排序。排序效果，第一个先排序，相同时对第二个进行排序。
+
+```shell
+GET /_search
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"tweet": "manage text search"}}
+      ],
+      "filter": {"term": {
+        "tweet_id": "1"
+      }}
+    }
+  },
+  "sort": [
+    {
+      "date": {
+        "order": "desc"
+      }
+    },
+     {
+      "_score": {
+        "order": "desc"
+      }
+    }
+  ]
+}
+```
+
+  
+Query-string 搜索也支持自定义排序，可以在查询字符串中使用 `sort` 参数：
+`GET /_search?sort=date:desc&sort=_score&q=search`
+
+> 多值排序
+
+比如字段中有多个值，例如数组形式。这时需要将多值字段处理成单值来排序，通过使用 `min` 、 `max` 、 `avg` 或是 `sum` _排序模式_ 来指定。
+
+```shell
+# 在字段 dates 中取出最少值来参与排序
+"sort": {
+    "dates": {
+        "order": "asc",
+        "mode":  "min"
+    }
+}
+```
+
+###### 字符串排序和多字段
+
+被解析的字符串字段也是多值字段，但是很少会按照你想要的方式进行排序。如果想要分析一个字符串，如 `fine old art`，当我们想要处理成按第一个单词首字母排序，然后按第二单词的首字母排序的操作，可是 ES 并不支持该类的操作。
+
+如果使用 `min` 和 `max` 排序模式（默认是 `min` ），但是这会导致排序以 `art` 或是 `old` ，任何一个都不是所希望的。
+
+这时我们可以对字段进行多字段映射，专门用来排序。这时我们可以使用 `tweet` 字段用于搜索，`tweet.raw` 字段用于排序：
+
+```shell
+# 无多字段映射
+"tweet": {
+    "type":     "string",
+    "analyzer": "english"
+}
+
+# 多字段映射
+"tweet": {
+    "type":     "string",
+    "analyzer": "english",
+    "fields": {
+        "raw": { 
+            "type":  "string",
+            "index": "not_analyzed"
+        }
+    }
+}
+```
+
+**WARNING：**  以全文 `analyzed` 字段排序会消耗大量的内存。获取更多信息请看 [聚合与分析](https://www.elastic.co/guide/cn/elasticsearch/guide/current/aggregations-and-analysis.html "聚合与分析") 。
