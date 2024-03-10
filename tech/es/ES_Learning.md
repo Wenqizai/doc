@@ -3136,4 +3136,108 @@ PUT /my_index
 }
 ```
 
-`_default_` 映射也是一个指定索引 [dynamic templates](https://www.elastic.co/guide/cn/elasticsearch/guide/current/custom-dynamic-mapping.html#dynamic-templates "动态模板") 的好方法。
+`_default_` 映射也是一个指定索引 [dynamic templates]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/custom-dynamic-mapping.html#dynamic-templates "动态模板") 的好方法。
+
+##### 重建索引
+
+尽管可以增加新的类型索引到索引中，或者增加新的字段到类型中，但是*不能添加新的分析器或者对现有的字段做改动*。如果你那么做的话，结果就是那些已经被索引的数据就不正确，搜索也不能正常工作。
+
+对现有的数据的这类改变最简单的办法就是重新索引：用新的设置创建新的索引并把文档从旧的索引复制到新的索引。
+
+字段 `_source` 的一个有点是在 ES 中已经有了整个文档，不必从源数据中重建索引（而且这种方式通常是比较慢的）。
+
+为了有效的重新索引所有在旧索引中的文档，用 scroll 从旧的索引检索批量文档，然后用 bulk API 把文档推送到新的索引中。
+
+从 ES 2.3 开始， [Reindex API](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/docs-reindex.html) 被引入。它能够对文档重建索引而不需要任何插件或外部工具。
+
+**批量重新索引**
+
+同时并行运行多个重建索引任务，但是你显然不希望结果有重叠。正确的做法是按日期或者时间 这样的字段作为过滤条件把大的重建索引分成小的任务：
+
+```shell
+GET /old_index/_search?scroll=1m
+{
+    "query": {
+        "range": {
+            "date": {
+                "gte":  "2014-01-01",
+                "lt":   "2014-02-01"
+            }
+        }
+    },
+    "sort": ["_doc"],
+    "size":  1000
+}
+```
+
+如果旧的索引会持续变化，你希望新的索引中也包括那些新加的文档。那就可以对新加的文档做重新索引，但还是要用日期类字段过滤来匹配那些新加的文档。
+
+###### 索引别名和零停机
+
+在重建索引时，问题必须更新应用的索引名称。索引别名就是用来解决这个问题。
+
+索引别名就像一个快捷方式或软链接，可以指向一个或多个索引，也可以给任何一个需要索引名的 API 来使用。使用别名，我们可以：
+
+1. 在运行的集群中可以无缝的从一个索引切换到另一个索引；
+2. 给多个索引分组（例如：`last_three_months` ）；
+3. 给索引的一个子集创建视图。
+
+有两种方式管理别名： `_alias` 用于单个操作， `_aliases` 用于执行多个原子级操作。
+
+```shell
+# 创建索引 my_index_v1
+PUT /my_index_v1
+
+# 创建别名 my_index 指向 my_index_v1
+PUT /my_index_v1/_alias/my_index
+```
+
+同时也可以检测这个别名指向哪一个索引：
+
+```shell
+GET /*/_alias/my_index
+```
+
+或者哪些别名指向这个索引：
+
+```shell
+GET /my_index_v1/_alias/*
+```
+
+当我们巨顶修改索引中一个字段的映射时，当然我们不能修改现存的映射，所以我们必须重新索引数据。手心，我们用新映射创建索引 `my_index_v2`。
+
+```shell
+PUT /my_index_v2
+{
+    "mappings": {
+        "my_type": {
+            "properties": {
+                "tags": {
+                    "type":   "string",
+                    "index":  "not_analyzed"
+                }
+            }
+        }
+    }
+}
+```
+
+然后我们将数据从 `my_index_v1` 索引到 `my_index_v2` ，下面的过程在 [重新索引你的数据]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/reindex.html "重新索引你的数据") 中已经描述过。一旦我们确定文档已经被正确地重索引了，我们就将别名指向新的索引。
+
+一个别名可以指向多个索引，所以我们在添加别名到新索引的同时必须从旧的索引中删除它。这个操作需要原子化，这意味着我们需要使用 `_aliases` 操作：
+
+```shell
+POST /_aliases
+{
+    "actions": [
+        { "remove": { "index": "my_index_v1", "alias": "my_index" }},
+        { "add":    { "index": "my_index_v2", "alias": "my_index" }}
+    ]
+}
+```
+
+你的应用已经在零停机的情况下从旧索引迁移到新索引了。
+
+**重要：** 即使你认为现在的索引设计已经很完美了，在生产环境中，还是有可能需要做一些修改的。
+
+做好准备：<font color="#c0504d">在你的应用中使用别名而不是索引名</font>。然后你就可以在任何时候重建索引。别名的开销很小，应该广泛使用。
