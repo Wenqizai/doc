@@ -2661,4 +2661,200 @@ PUT /my_temp_index/_settings
 }
 ```
 
+#### 分析器
 
+索引重要的配置是 `analysis` 部分，它是用来配置已存在的分析器或针对索引来创建新的自定义分析器。
+回顾分词器的作用：[分析与分析器 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/analysis-intro.html)
+
+`standard` 分词器是用于全文字段的默认分词器，主要有以下特点：
+1. `standard` 分词器，通过单词边界分割输入的文本；
+2. `standard` 语汇单元过滤器，目的是整理分词器触发的语汇单元（但是目前什么都没做）;
+3. `lowercase` 语汇单元过滤器，转换所有的语汇单元为小写；
+4. `stop` 语汇单元过滤器，删除停用词一对搜索相关性影响不大的常用词，如 a, the, and, is。
+
+默认情况下，停用词过滤器是被禁用的。如需要启用他，可以通过创建一个基于 `standard` 分析器的自定义分析器并设置 `stopwords` 参数。可以给分析器停工一个停用词列表，或者告知使用一个基于特定语言的预定义停用词列表。
+
+在下面的例子中，我们创建了一个新的分析器，叫做 `es_std` ，并使用预定义的西班牙语停用词列表：
+
+```shell
+PUT /spanish_docs
+{
+    "settings": {
+        "analysis": {
+            "analyzer": {
+                "es_std": {
+                    "type":      "standard",
+                    "stopwords": "_spanish_"
+                }
+            }
+        }
+    }
+}
+```
+
+注意这里创建的 `es_std` **不是全局唯一的**，仅仅存在于我们定义的 `spanish_docs` 索引中。如果我们想要测试它，必须要指定索引名，如：
+
+```shell
+GET /spanish_docs/_analyze?analyzer=es_std
+El veloz zorro marrón
+```
+
+###### 自定义分析器
+
+ES 提供了一些现成的分析器，并支持通过一个适合特定数据的设置之中组合字符过滤器、分词器、词汇单元过滤器来创建自定义分词器。
+
+一个自定义的分词器，主要包含以下三个功能，并且是按顺序被执行的。
+
+> 字符过滤器 char_filter
+
+字符过滤器用来 `整理` 一个尚未被分词的字符串。比如，我们输入的文本是 HTML 格式的，包含  `<p>`、`<div>` 这样的 HTML 标签，而这些标签是我们不想索引的。
+
+我们可以使用 [`html清除` 字符过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-htmlstrip-charfilter.html) 来移除掉所有的 HTML 标签，并且像把 `&Aacute;` 转换为相对应的 Unicode 字符 `Á` 这样，转换 HTML 实体。
+
+一个分析器可能有0个或者多个字符过滤器。
+
+> 分词器 tokenizer
+
+分析器：Analysis
+分词器：Tokenizer
+
+一个分析器必须有一个**唯一的分词器**，分词器将字符串分解成单个词条或者词汇单元。`标准` 分析器里使用的 [`标准` 分词器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-standard-tokenizer.html) 把一个字符串根据单词边界分解成单个词条，并且移除掉大部分的标点符号，然而还有其他不同行为的分词器存在。
+
+例如， [`关键词` 分词器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-keyword-tokenizer.html) 完整地输出接收到的同样的字符串，并不做任何分词。 [`空格` 分词器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-whitespace-tokenizer.html) 只根据空格分割文本。 [`正则` 分词器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-pattern-tokenizer.html) 根据匹配正则表达式来分割文本。
+
+> 词单元过滤器 filter
+
+经过分词，作为结果的词单元流会按照指定的顺序通过指定的词单元过滤器。词单元过滤器可以**修改，添加或者移除词单元**。
+
+ [`lowercase`](http://www.elastic.co/guide/en/elasticsearch/reference/current/analysis-lowercase-tokenizer.html) 和 [`stop` 词过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-stop-tokenfilter.html) ，但是在 Elasticsearch 里面还有很多可供选择的词单元过滤器。 [词干过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-stemmer-tokenfilter.html) 把单词 `遏制` 为 词干。 [`ascii_folding` 过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-asciifolding-tokenfilter.html)移除变音符，把一个像 `"très"` 这样的词转换为 `"tres"` 。 [`ngram`](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-ngram-tokenfilter.html) 和 [`edge_ngram` 词单元过滤器](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/analysis-edgengram-tokenfilter.html) 可以产生 适合用于部分匹配或者自动补全的词单元。
+
+###### 创建自定义分析器
+
+我们可以在 `settings` 下的 `analysis` 来设置自定义分析器的字符过滤器、分词器和词单元过滤器。
+
+```shell
+PUT /my_index
+{
+    "settings": {
+        "analysis": {
+            "char_filter": { ... custom character filters ... },
+            "tokenizer":   { ...    custom tokenizers     ... },
+            "filter":      { ...   custom token filters   ... },
+            "analyzer":    { ...    custom analyzers      ... }
+        }
+    }
+}
+```
+
+**char_filter**
+
+1. 使用 `html 清除` 字符过滤器移除 HTML 部分；
+2. 使用一个自定义的 `映射` 字符过滤器把 `&` 替换成 `and`
+
+```shell
+"char_filter": {
+	"html_strip": {
+		"type": "html_strip"
+	},
+	"&_to_and": {
+		"type": "mapping",
+		"mappings": [
+			"&=> and "
+		]
+	}
+}
+```
+
+1. 使用 `标准` 分词器分词；
+2. 小写词条，使用 `小写` 词过滤器处理；
+3. 使用自定义 `停止` 词过滤器移除自定义的停止词列表中包含的词；
+
+```
+"filter": {
+    "my_stopwords": {
+        "type":        "stop",
+        "stopwords": [ "the", "a" ]
+    }
+}
+```
+
+创建自定义的分析器：
+
+```
+"analyzer": {
+    "my_analyzer": {
+        "type":           "custom",
+        "char_filter":  [ "html_strip", "&_to_and" ],
+        "tokenizer":      "standard",
+        "filter":       [ "lowercase", "my_stopwords" ]
+    }
+}
+```
+
+完整的请求：
+
+```shell
+PUT /my_index
+{
+    "settings": {
+        "analysis": {
+            "char_filter": {
+                "&_to_and": {
+                    "type": "mapping",
+                    "mappings": [
+                        "&=> and "
+                    ]
+                }
+            },
+            "filter": {
+                "my_stopwords": {
+                    "type": "stop",
+                    "stopwords": [
+                        "the",
+                        "a"
+                    ]
+                }
+            },
+            "analyzer": {
+                "my_analyzer": {
+                    "type": "custom",
+                    "char_filter": [
+                        "html_strip",
+                        "&_to_and"
+                    ],
+                    "tokenizer": "standard",
+                    "filter": [
+                        "lowercase",
+                        "my_stopwords"
+                    ]
+                }
+            }
+        }
+    }
+}
+```
+
+索引被创建之后，可以使用 `analyze` API 来测试这个新的分析器：
+
+```shell
+GET /my_index/_analyze
+{
+  "analyzer": "my_analyzer",
+  "text": "The quick & brown fox"
+}
+```
+
+自定义的分析器虽然构建成功，但是还是没什么用处。接下来我们需要告诉 ES 在什么地方用上这个分词器才完成我们自定义分析器的功能。
+
+比如，指定索引 `my_index` 的 `title` 字段类型是 `string` 的使用自定义分析器 `analyzer`。
+```shell
+PUT /my_index/_mapping
+{
+    "properties": {
+        "title": {
+            "type":      "text",
+            "analyzer":  "my_analyzer"
+        }
+    }
+}
+```
