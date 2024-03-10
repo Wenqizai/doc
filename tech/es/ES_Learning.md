@@ -2965,3 +2965,175 @@ GET /_search
 注意：ES 6.0 + 已经废弃 `_all` 字段了，取代方式是 `copy to`。
 
 [ES的index、store、\_source、copy\_to和\_all的区别 - 未月廿三 - 博客园](https://www.cnblogs.com/eternityz/p/17039189.html)
+
+###### 动态映射
+
+当 ES 遇到文档中以前未出现的字段时，它用 [_dynamic mapping_]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/mapping-intro.html "映射") 来确定字段的数据类型并自动把新的字段添加到类型映射。
+
+有时这是想要的行为有时又不希望这样。通常没有人知道以后会有什么新字段加到文档，但是又希望这些字段被自动的索引。也许你只想忽略它们。如果Elasticsearch是作为重要的数据存储，可能就会期望遇到新字段就会抛出异常，这样能及时发现问题。
+
+幸运的是可以用 `dynamic` 配置来控制这种行为 ，可接受的选项如下：
+
+-  `true`：动态添加新的字段
+- `false`：忽略新的字段
+- `strict`：如果遇到新字段抛出异常
+
+配置 `dynamic` 参数可以在根对象或任何对象类型的字段上。可以将 `dynamic` 的默认值设置为 `strict` , 而只在指定的内部对象中开启它。
+
+```shell
+PUT /my_index
+{
+    "mappings": {
+        "dynamic": "strict",
+        "properties": {
+            "title": {
+                "type": "text"
+            },
+            "stash": {
+                "type": "object",
+                "dynamic": true
+            }
+        }
+    }
+}
+```
+
+这个 mapping ，规定只有两个字段，其作用是：
+1. 遇到新字段，就会抛出异常
+2. 而内部对象 `stash` 对象添加新的可检索的字段。
+
+成功的示例：
+
+```shell
+PUT /my_index/_doc/1
+{
+    "title":   "This doc adds a new field",
+    "stash": { "new_field": "Success!" }
+}
+```
+
+失败的示例：
+
+```shell
+PUT /my_index/_doc/1
+{
+    "title":     "This throws a StrictDynamicMappingException",
+    "new_field": "Fail!"
+}
+```
+
+**NOTE：**  把 `dynamic` 设置为 `false` 一点儿也不会改变 `_source` 的字段内容。 `_source` 仍然包含被索引的整个 JSON 文档。只是新的字段不会被加到映射中也不可搜索。
+
+###### 自定义动态映射
+
+如果启用了动态映射功能，有时动态映射的规则可能不太智能。我们可以通过设置自定义规则，以便更好适用于我们的数据。
+
+> 日期检测
+
+当 ES 遇到一个新的字符串字段时，它会检测这个字段是否包含一个可识别的日期。例如，`2014-01-01`，这个字段像日期，就会被作为 `date` 类型添加，否则才会作为 `string` 类型添加。
+
+这种识别方式，有时会带来一些问题，比如：
+
+```shell
+# 首次添加
+{ "note": "2014-01-01" }
+
+# 第二次添加
+{ "note": "Logged out" }
+```
+
+第一次动态映射 `note` 字段成为 `date` 类型，而第二次 `note` 的值明显不是一个 `date` 类型。此时这个 `不合法的日期` 将会造成一个异常。
+
+此时，我们可以通过关闭日期检测，来让这个字段的属性始终作为 `string` 。
+
+```shell
+PUT /my_index
+{
+    "mappings": {
+        "my_type": {
+            "date_detection": false
+        }
+    }
+}
+```
+
+**NOTE：** 此外我们亦可以配置动态模板中的日期检测的格式来识别字符串中的日期。Elasticsearch 判断字符串为日期的规则可以通过 [`dynamic_date_formats` setting](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/dynamic-field-mapping.html#date-detection) 来设置。
+
+> 动态模板
+
+使用 `dynamic_templates`，可以完全控制新检测生成字段的映射，甚至可以通过字段名称或数据类型来应用不同的映射。
+
+每个模板都有一个名称，可以用来描述这个模板的用途，一个 `mapping` 来指定映射应该怎样使用，以及至少一个参数 (如 `match`) 来定义这个模板适用于哪个字段。*模板是按照顺序来检测的，第一个匹配的模板会被启用。
+
+例如，我们给 `string` 类型字段定义两个模板：
+1. `es`：以 `_es` 结尾的字段名需要使用 `spanish` 分词器；
+2. `en`：所有其他字段使用 `english` 分词器。
+
+```shell
+PUT /my_index
+{
+    "mappings": {
+        "dynamic_templates": [
+            {
+                "es": {
+                    "match": "*_es",
+                    "match_mapping_type": "string",
+                    "mapping": {
+                        "type": "text",
+                        "analyzer": "spanish"
+                    }
+                }
+            },
+            {
+                "en": {
+                    "match": "*",
+                    "match_mapping_type": "string",
+                    "mapping": {
+                        "type": "text",
+                        "analyzer": "english"
+                    }
+                }
+            }
+        ]
+    }
+}
+```
+
+`"match": "*_es"` ：匹配字段名以 `_es` 结尾的字段；
+`"match": "*"` ：匹配其他所有字符串类型字段；
+`match_mapping_type`：允许应用模板到特定类型的字段上，就像有标准动态映射规则检测的一样， (例如 `string` 或 `long`)。
+`match` ：参数只匹配字段名称， `path_match` 参数匹配字段在对象上的完整路径，所以 `address.*.name` 将匹配这样的字段：
+
+```json
+{
+    "address": {
+        "city": {
+            "name": "New York"
+        }
+    }
+}
+```
+
+更多的配置选项见 [动态映射文档](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/dynamic-mapping.html) 。
+
+> 缺省映射
+
+常，一个索引中的所有类型共享相同的字段和设置。 `_default_` 映射更加方便地指定通用设置，而不是每次创建新类型时都要重复设置。 `_default_` 映射是新类型的模板。在设置 `_default_` 映射之后创建的所有类型都将应用这些缺省的设置，除非类型在自己的映射中明确覆盖这些设置。
+
+例如，我们可以使用 `_default_` 映射为所有的类型禁用 `_all` 字段，而只在 `blog` 类型启用：
+
+```
+PUT /my_index
+{
+    "mappings": {
+        "_default_": {
+            "_all": { "enabled":  false }
+        },
+        "blog": {
+            "_all": { "enabled":  true  }
+        }
+    }
+}
+```
+
+`_default_` 映射也是一个指定索引 [dynamic templates](https://www.elastic.co/guide/cn/elasticsearch/guide/current/custom-dynamic-mapping.html#dynamic-templates "动态模板") 的好方法。
