@@ -14,6 +14,8 @@ es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.c
 > 搜索
 
 ES 深度分页的实践： [Elasticsearch Deep Pagination - Wojik](https://kwojcicki.github.io/blog/ES-PAGINATION)
+[ElasticSearch中\_source、store\_fields、doc\_values性能比较 | holmofy](https://blog.hufeifei.cn/2021/10/DB/source-stored-docvalues/index.html)
+
 
 > 映射
 
@@ -2661,7 +2663,7 @@ PUT /my_temp_index/_settings
 }
 ```
 
-#### 分析器
+##### 分析器
 
 索引重要的配置是 `analysis` 部分，它是用来配置已存在的分析器或针对索引来创建新的自定义分析器。
 回顾分词器的作用：[分析与分析器 | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/analysis-intro.html)
@@ -2858,3 +2860,108 @@ PUT /my_index/_mapping
     }
 }
 ```
+
+##### 类型和映射
+
+映射，就像数据库中的 schema，描述了文档可能具有的字段或属性、每个字段的数据类型，比如 `string`、`integer` 或 `date`，以及 Lucene 是如何索引和存储这些字段的。
+
+在 Lucene 中，一个文档由一组简单的键值对组成。 每个字段都可以有多个值，但至少要有一个值。类似的，一个字符串可以通过分析过程转化为多个值。Lucene 不关心这些值是字符串、数字或日期—​所有的值都被当做 _不透明字节_ 。
+
+当我们在 Lucene 中索引一个文档时，每个字段的值都被添加到相关字段的倒排索引中。你也可以将未处理的原始数据 _存储_ 起来，以便这些原始数据在之后也可以被检索到。
+
+Lucene 也没有映射的概念。映射是 Elasticsearch 将复杂 JSON 文档 _映射_ 成 Lucene 需要的扁平化数据的方式。
+
+例如，在 `user` 类型中， `name` 字段的映射可以声明这个字段是 `string` 类型，并且它的值被索引到名叫 `name` 的倒排索引之前，需要通过 `whitespace` 分词器分析：
+
+```shell
+"name": {
+    "type":     "string",
+    "analyzer": "whitespace"
+}
+```
+
+###### 根对象
+
+映射最高一层称为**根对象**，可能包含下面几项：
+1. 一个 properties 节点，列出了文档中可能包含的每个字段的映射；
+2. 各种元数据字段，他们都以一个下划线开头，例如：`_type`、`_id` 和 `_source`；】
+3. 设置项，控制如何动态处理新的字段，例如 `analyzer` 、`dynamic_date_formats` 和 `dynamic_templates`；
+4. 其他设置，可以同时应用在跟对象和其他 `object` 类型字段上，例如：`enabled`、`dynamic` 和 `include_in_all`。
+
+###### 属性
+
+我们已经在 [核心简单域类型](https://www.elastic.co/guide/cn/elasticsearch/guide/current/mapping-intro.html#core-fields "核心简单域类型") 和 [复杂核心域类型](https://www.elastic.co/guide/cn/elasticsearch/guide/current/complex-core-fields.html "复杂核心域类型") 章节中介绍过文档字段和属性的三个最重要的设置：
+
+`type`：字段的数据类型，例如 `string` 或 `date`
+
+`index`：字段是否应当被当成全文来搜索（ `analyzed` ），或被当成一个准确的值（ `not_analyzed` ），还是完全不可被搜索（ `no` ）
+
+`analyzer`：确定在索引和搜索时全文字段使用的 `analyzer`
+
+我们将在本书的后续部分讨论其他字段类型，例如 `ip` 、 `geo_point` 和 `geo_shape` 。
+
+###### 元数据
+
+> `_source` 字段
+
+默认地，ES 在 `_source` 字段存储代表文档的 JSON 字符串，和所有被存储的字段一样，`_source` 字段在在写入磁盘之前先会被压缩。`_source` 字段的作用：
+
+- 搜索结果包含整个可用的文档，意味者不需要额外地从另外一个数据仓库取文档；
+- 如果没有 `_source` 字段，部分 `update` 请求不会生效；
+- 当映射改变时，需要重新索引数据，有 `_source` 字段时，我们可以直接取到文档，而不必从另一个（通常是速度更慢的）数据仓库取回你的所有文档；
+- 当你不需要看到整个文档时，单个字段可以从 `_source` 字段提取和通过 `get` 或者 `search` 请求返回；
+- 调试查询语句更加简单，因为你可以直接看到每个文档包括什么，而不是从一列id猜测它们的内容。
+
+然而，存储 `_source` 字段的确要使用磁盘空间。如果上面的原因对你来说没有一个是重要的，你可以用下面的映射禁用 `_source` 字段，此时在 search 文档时，只会返回 id，没有 `_source`。
+
+**注意**：此时使用 `_search` 字段检索，仍然可以将文档检索出来。意味者 `_source` 虽然没有存储，但是也会建立对应的倒排索引。
+
+```shell
+PUT /my_index
+{
+    "mappings": {
+        "_source": {
+            "enabled": false
+        }
+    }
+}
+
+```
+
+同时，我们可以在一些请求体中指定 `_source` 参数，来达到只获取特定的字段的效果，同时也减少网络的 IO。这些字段的值会从 `_source` 字段被提取和返回，而不是返回整个 `_source` 。
+
+```shell
+GET /_search
+{
+    "query":   { "match_all": {}},
+    "_source": [ "title", "created" ]
+}
+```
+
+**Stored Fields 被存储字段**
+
+为了之后的检索，除了索引一个字段的值，你 还可以选择 `存储` 原始字段值。有 Lucene 使用背景的用户使用被存储字段来选择他们想要在搜索结果里面返回的字段。事实上， `_source` 字段就是一个被存储的字段。
+
+在 Elasticsearch 中，对文档的个别字段设置存储的做法通常不是最优的。整个文档已经被存储为 `_source` 字段。使用 `_source` 参数提取你需要的字段总是更好的。
+
+
+[ES stored fields作用\_stored\_fields-CSDN博客](https://blog.csdn.net/m0_45406092/article/details/107631883)
+
+> `_all` 字段
+
+在 [_轻量_ 搜索]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/search-lite.html "轻量搜索") 中，我们介绍了 `_all` 字段：一个把其它字段值当作一个大字符串来索引的特殊字段。 `query_string` 查询子句(搜索 `?q=john` )在没有指定字段时默认使用 `_all` 字段。
+
+`_all` 字段在新应用的探索阶段，当你还不清楚文档的最终结构时是比较有用的。你可以使用这个字段来做任何查询，并且有很大可能找到需要的文档：
+
+``` shell
+GET /_search
+{
+    "match": {
+        "_all": "john smith marketing"
+    }
+}
+```
+
+注意：ES 6.0 + 已经废弃 `_all` 字段了，取代方式是 `copy to`。
+
+[ES的index、store、\_source、copy\_to和\_all的区别 - 未月廿三 - 博客园](https://www.cnblogs.com/eternityz/p/17039189.html)
