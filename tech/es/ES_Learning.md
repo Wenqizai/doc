@@ -2575,4 +2575,90 @@ GET /_search?search_type=dfs_query_then_fetch
 
 游标查询允许我们先做查询初始化，然后再批量地拉取结果。这有点儿像传统数据库中的 _cursor_ 。
 
-[游标查询 Scroll | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/scroll.html)
+[游标查询 Scroll | Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/scroll.html)]
+
+#### 索引管理
+##### 创建索引
+
+我们可以通过索引一个文档来创建一个新的索引，但是这个索引采用的是默认的配置，新的字段是通过动态映射的方式被调加到类型映射。
+
+如果我们需要对这个索引过程做更多的控制，我们就需要在索引任何数据之前，建立好分析器和映射。
+
+```shell
+PUT /my_index
+{
+    "settings": { ... any settings ... },
+    "mappings": {
+        "type_one": { ... any mappings ... },
+        "type_two": { ... any mappings ... },
+        ...
+    }
+}
+```
+
+如果禁止自动创建索引，可以通过配置每个节点的 `config/elasticsearch.yml`。
+
+```yml
+action.auto_create_index: false
+```
+
+**NOTE：** 我们会在之后讨论你怎么用 [索引模板]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/index-templates.html "索引模板") 来预配置开启自动创建索引。这在索引日志数据的时候尤其有用：你将日志数据索引在一个以日期结尾命名的索引上，子夜时分，一个预配置的新索引将会自动进行创建。
+
+##### 删除索引
+
+构建以下示例请求来删除指定的索引：
+
+```shell
+# 删除指定索引
+DELETE /my_index
+
+# 删除多个索引
+DELETE /index_one,index_two
+DELETE /index_*
+
+# 删除全部索引
+DELETE /_all
+DELETE /*
+```
+
+> 重要
+
+对一些人来说，能够用单个命令来删除所有数据可能会导致可怕的后果。如果你想要避免意外的大量删除, 你可以在你的 `elasticsearch.yml` 做如下配置：
+
+```yml
+action.destructive_requires_name: true
+```
+
+这个设置使删除只限于特定名称指向的数据, 而不允许通过指定 `_all` 或通配符来删除指定索引库。你同样可以通过 [Cluster State API]( https://www.elastic.co/guide/cn/elasticsearch/guide/current/_changing_settings_dynamically.html "动态变更设置") 动态的更新这个设置。
+
+##### 索引设置
+
+我们可以通过修改配置来自定义索引行为，详细配置参照 [索引模块](https://www.elastic.co/guide/en/elasticsearch/reference/5.6/index-modules.html)
+
+**TIP：** ES 提供的默认配置是经过优化的，除非知晓修改这些配置的作用和收益，否则不要随意修改。
+
+**两个重要的配置**
+1. `number_of_shards` ：每个索引的主分片数，默认值 5，这个配置在索引创建后不能修改；
+2. `number_of_replicas`：每个主分片的副本数，默认值 1，对于活动的索引库，这个配置可以随时修改。
+
+```shell
+# 创建只有一个主分片，没有副本分片的小索引
+PUT /my_temp_index
+{
+    "settings": {
+        "number_of_shards" :   1,
+        "number_of_replicas" : 0
+    }
+}
+```
+
+通过 `update-index-settings` API 动态修改副本数：
+
+```shell
+PUT /my_temp_index/_settings
+{
+    "number_of_replicas": 1
+}
+```
+
+
