@@ -5,6 +5,7 @@
 
 官方文档：[Elasticsearch: 权威指南 | Elastic](https://www.elastic.co/guide/cn/elasticsearch/guide/current/index.html)
 es 中文社区：[搜索客，搜索人自己的社区](https://elasticsearch.cn/)
+课程： [01 认知：ElasticSearch基础概念](https://learn.lianglianglee.com/%e4%b8%93%e6%a0%8f/ElasticSearch%e7%9f%a5%e8%af%86%e4%bd%93%e7%b3%bb%e8%af%a6%e8%a7%a3/01%20%e8%ae%a4%e7%9f%a5%ef%bc%9aElasticSearch%e5%9f%ba%e7%a1%80%e6%a6%82%e5%bf%b5.md)
 
 > 集群
 1. docker-compose 搭建集群：[ElasticSearch 集群部署 - 晓风残月的博客](https://www.baiyp.ren/elasticsearch-%E9%9B%86%E7%BE%A4%E9%83%A8%E7%BD%B2.html)
@@ -24,6 +25,11 @@ ES 深度分页的实践： [Elasticsearch Deep Pagination - Wojik](https://kwoj
 [如何在es中查询null值或者不存在的字段-duidaima 堆代码](https://www.duidaima.com/Group/Topic/OtherWeb/9396)
 [null\_value | Elasticsearch Guide \[8.12\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/reference/current/null-value.html )
 [Dealing with Null Values | Elasticsearch: The Definitive Guide \[2. X\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/guide/2.x/_dealing_with_null_values.html#_exists_query )
+
+> 索引
+
+[关于Lucene的词典FST深入剖析 | 申艳超-博客](https://www.shenyanchao.cn/blog/2018/12/04/lucene-fst/)
+
 ### 材料准备
 
 #### 1.  入门
