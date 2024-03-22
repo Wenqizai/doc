@@ -26,9 +26,17 @@ ES 深度分页的实践： [Elasticsearch Deep Pagination - Wojik](https://kwoj
 [null\_value | Elasticsearch Guide \[8.12\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/reference/current/null-value.html )
 [Dealing with Null Values | Elasticsearch: The Definitive Guide \[2. X\] | Elastic]( https://www.elastic.co/guide/en/elasticsearch/guide/2.x/_dealing_with_null_values.html#_exists_query )
 
-> 索引
+> Lucene 索引，字典树
+
+[lucene字典实现原理 - zhanlijun - 博客园](https://www.cnblogs.com/LBSer/p/4119841.html)
 
 [关于Lucene的词典FST深入剖析 | 申艳超-博客](https://www.shenyanchao.cn/blog/2018/12/04/lucene-fst/)
+
+[信息检索——初识Trie树 - 爱吃土豆的男孩 - 博客园](https://www.cnblogs.com/dk666/p/7085968.html)
+
+[HanLP — 双数组字典树 (Double-array Trie) 实现原理 -- 代码 + 图文，看不懂你来打我 - VipSoft - 博客园](https://www.cnblogs.com/vipsoft/p/17774393.html)
+
+FST 树演示： [examples.mikemccandless.com/fst.py](http://examples.mikemccandless.com/fst.py)
 
 ### 材料准备
 
