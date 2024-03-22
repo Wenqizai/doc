@@ -38,6 +38,12 @@ ES 深度分页的实践： [Elasticsearch Deep Pagination - Wojik](https://kwoj
 
 FST 树演示： [examples.mikemccandless.com/fst.py](http://examples.mikemccandless.com/fst.py)
 
+> ES 索引原理
+
+[ES底层读写工作原理，看这一篇就够了！ - 掘金](https://juejin.cn/post/7034068713011839006)
+
+[elasticsearch 原理及入门 - Kiosk's 个人编程技术分享](https://kiosk007.top/post/elasticsearch/)
+
 ### 材料准备
 
 #### 1.  入门
