@@ -28,6 +28,8 @@ ES 深度分页的实践： [Elasticsearch Deep Pagination - Wojik](https://kwoj
 
 > Lucene 索引，字典树
 
+Lucene 索引实现： [刘超觉先 - 博客园](https://www.cnblogs.com/forfuture1978)
+
 [lucene字典实现原理 - zhanlijun - 博客园](https://www.cnblogs.com/LBSer/p/4119841.html)
 
 [关于Lucene的词典FST深入剖析 | 申艳超-博客](https://www.shenyanchao.cn/blog/2018/12/04/lucene-fst/)
@@ -3279,6 +3281,9 @@ POST /_aliases
 传统的数据库对全文检索是不太友好的，如果要支持全文检索，那么需要对每一个字段索引多个值，此时普通的索引就不太适用了。
 
 倒排索引，支持一个字段多个值索引的数据结构。倒排索引包含一个**有序列表**，列表包含所有文档出现过的不重复个体，或称为词项，对于每一个此项，包含了它所有曾出现过文档的列表。
+
+Lucene，底层使用的倒排索引数据结构是 FST（Finite State Transducer）,
+
 
 ⚠️upload failed, check dev console
 ![[倒排索引.png]]
