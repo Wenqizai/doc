@@ -52,6 +52,7 @@ https://github.com/dofy/learn-vim
 - `dd` → 删除当前行，并把删除的行存到剪贴板里
 - `u` → undo
 - `Ctrl + r` → redo
+- `D` -> 删除至行尾
 
 ## 打开/保存/退出/改变文件
 
