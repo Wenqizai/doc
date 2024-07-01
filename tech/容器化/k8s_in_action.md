@@ -101,3 +101,45 @@ Kubernetes 整个系统由一个 Master 节点和多个工作节点组成。开�
 ⚠️upload failed, check dev console
 ![[k8s体系结构.png]]
 
+#### Demo 
+
+- 准备数据
+
+`/resources/k8s_in_action/demo/chapter02/*`
+
+- 构建镜像
+
+```
+docker build -t kubia .
+```
+
+- 运行镜像
+
+```
+docker run --name kubia-container -p 8080:8080 -d kubia
+```
+
+ Tesing
+ 
+```
+docker logs -f <cid>
+curl localhost:8080
+```
+
+- 观察
+
+1. docker 容器内执行
+
+```
+docker exec -it <cid> /bin/bash
+ps aux | grep node.js
+```
+
+
+2. 宿主机执行
+
+```
+ps aux | grep node.js
+```
+
+可以看到容器内和宿主机均有运行进程 `node.js`，但 pid 两者不同。证明容器内进程依附于宿主机进程运行。 
