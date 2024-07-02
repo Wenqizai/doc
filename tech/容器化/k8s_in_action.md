@@ -1,4 +1,10 @@
-关于书籍：《Kubernetes in Action 中⽂版》，by Marko Luksa，译 七牛容器云团队。
+关于书籍：《Kubernetes in Action 中⽂版》，by Marko Luksa，译七牛容器云团队。
+
+## 文档
+
+[Kubernetes](https://kubernetes.io/)
+[Docker: Accelerated Container Application Development](https://www.docker.com/)
+[Kubernetes(K8S)中文文档\_Kubernetes中文社区](http://docs.kubernetes.org.cn/)
 
 # 介绍
 
@@ -102,18 +108,19 @@ Kubernetes 整个系统由一个 Master 节点和多个工作节点组成。开�
 ![[k8s体系结构.png]]
 
 #### Demo 
+##### Docker 
 
-- 准备数据
+> 准备数据
 
 `/resources/k8s_in_action/demo/chapter02/*`
 
-- 构建镜像
+> 构建镜像
 
 ```
 docker build -t kubia .
 ```
 
-- 运行镜像
+> 运行镜像
 
 ```
 docker run --name kubia-container -p 8080:8080 -d kubia
@@ -126,7 +133,7 @@ docker logs -f <cid>
 curl localhost:8080
 ```
 
-- 观察
+> 观察
 
 1. docker 容器内执行
 
@@ -143,3 +150,71 @@ ps aux | grep node.js
 ```
 
 可以看到容器内和宿主机均有运行进程 `node.js`，但 pid 两者不同。证明容器内进程依附于宿主机进程运行。 
+
+> 推送镜像
+
+```
+# 镜像重命名
+docker tag kubia k8s_in_action/kubia 
+# 推送镜像
+docker push k8s_in_action/kubia 
+```
+
+##### Kubernetes 
+
+###### 安装
+
+> 安装 kubelet kubeadm kubectl
+
+- 配置仓库
+
+```
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+```
+
+- 安装
+
+```
+yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes	
+
+sudo swapoff -a
+kubeadm config images list
+
+kubeadm init 
+kubeadm init --image-repository=registry.aliyuncs.com/google_containers
+
+systemctl enable kubelet && systemctl start kubelet
+systemctl status kubelet
+
+```
+
+- Kubeadm init 失败
+
+```
+yum remove containerd
+yum update
+yum install -y containerd.io
+rm /etc/containerd/config.toml
+systemctl restart containerd
+```
+
+[kubeadm init error: CRI v1 runtime API is not implemented — Linux Foundation Forums](https://forum.linuxfoundation.org/discussion/862825/kubeadm-init-error-cri-v1-runtime-api-is-not-implemented)
+
+[使用 Kubeadm 部署 | 凤凰架构](https://icyfenix.cn/appendix/deployment-env-setup/setup-kubernetes/setup-kubeadm.html)
+
+
+> minikube 安装单机 k8s 集群
+
+[使用minikube安装kubernetes | kubernetes-notes](https://k8s.huweihuang.com/project/setup/installer/install-k8s-by-minikube)
+
+```
+minikube start --vm-driver=none
+```
