@@ -1,6 +1,6 @@
 关于书籍：《Kubernetes in Action 中⽂版》，by Marko Luksa，译七牛容器云团队。
 
-## 文档
+# 文档
 
 [Kubernetes](https://kubernetes.io/)
 [Docker: Accelerated Container Application Development](https://www.docker.com/)
@@ -61,7 +61,7 @@ Kubernetes 整个系统由一个 Master 节点和多个工作节点组成。开�
 ⚠️upload failed, check dev console
 ![[k8s工作流程.png]]
 
- #### Kubernetes 集群架构
+#### Kubernetes 集群架构
 
 ##### 控制面板
 
@@ -87,6 +87,17 @@ Kubernetes 整个系统由一个 Master 节点和多个工作节点组成。开�
 
 ⚠️upload failed, check dev console
 ![[k8s集群架构.png]]
+
+### Pod 
+
+>工作节点、Pod 和容器的关系
+
+Pod，是一组紧密相关的容器，运行在同一个工作节点和同一个 Linux 命名空间中。每个 Pod 就像一个独立逻辑机器，拥有自己的 IP、主机名、进程等。
+
+Kubernetes 集群有多个工作节点、节点内有多个 Pod，每个 Pod 都有自己的 IP，运行一个或多个容器，每个容器运行一个应用进程。
+
+![[工作节点-Pod-容器的关系.png]]
+
 
 ### Kubernetes 运行流程
 
@@ -182,8 +193,30 @@ EOF
 
 - 安装
 
+> Kubeadm
+
 ```
-yum install -y kubelet kubeadm kubectl --disableexcludes=kubernetes	
+rpm --import https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
+EOF
+
+yum update
+
+sudo yum remove -y kubelet kubeadm kubectl
+sudo yum install -y kubelet-1.22.14 kubeadm-1.22.14 kubectl-1.22.14
+
+ kubeadm init \
+  --pod-network-cidr=10.244.0.0/16 \
+  --kubernetes-version v1.22.14 \
+  --apiserver-advertise-address 10.0.88.85
 
 sudo swapoff -a
 kubeadm config images list
@@ -213,8 +246,38 @@ systemctl restart containerd
 
 > minikube 安装单机 k8s 集群
 
-[使用minikube安装kubernetes | kubernetes-notes](https://k8s.huweihuang.com/project/setup/installer/install-k8s-by-minikube)
+[Minikube 安装和简单使用 - 江湖小小白 - 博客园](https://www.cnblogs.com/jhxxb/p/15220729.html)
+[How to install cri-dockerd and migrate nodes from dockershim](https://www.mirantis.com/blog/how-to-install-cri-dockerd-and-migrate-nodes-from-dockershim)
 
 ```
+minikube start --driver=docker  --force 
 minikube start --vm-driver=none
+
+minikube delete
 ```
+
+- Docker 启动失败
+
+```
+echo {} > /etc/docker/daemon.json
+service docker restart 
+docker ps
+
+
+vim /etc/docker/daemon.json
+
+{
+	"exec-opts":["native.cgroupdriver=systemd"],
+	"registry-mirrors":[
+			"https://docker.m.daocloud.io",
+			"https://dockerproxy.com",
+			"https://hub.uuuadc.top/",
+			"https://docker.fxxk.dedyn.io/"
+	]
+}
+
+```
+
+
+## Kubernetes 集群
+
