@@ -111,7 +111,7 @@ Kubernetes 集群有多个工作节点、节点内有多个 Pod，每个 Pod 都
 
 [Pod 的生命周期 | Kubernetes](https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/pod-lifecycle/)
 
-### Kubernetes 运行流程
+### Kubernetes 安装运行
 
 1. 开发打包应用成为容器镜像、推送到镜像仓库、将应用描述发布到 Kubernetes API 服务器。
 
@@ -130,11 +130,31 @@ Kubernetes 集群有多个工作节点、节点内有多个 Pod，每个 Pod 都
 ⚠️upload failed, check dev console
 ![[k8s体系结构.png]]
 
-#### Demo 
-##### Docker 
+#### Docker 
+
+> Docker 配置
+
+```
+vim /etc/docker/daemon.json
+
+{
+	"insecure-registries":["http://10.0.88.85:5000"],
+	"exec-opts":["native.cgroupdriver=systemd"],
+	"registry-mirrors":[
+			"https://docker.m.daocloud.io",
+			"https://dockerproxy.com",
+			"https://hub.uuuadc.top/",
+			"https://docker.fxxk.dedyn.io/"
+	]
+}
+```
+
+
 > 搭建本地仓库
 
 [搭建docker镜像仓库(一)：使用registry搭建本地镜像仓库 - 人生的哲理 - 博客园](https://www.cnblogs.com/renshengdezheli/p/16646969.html)
+
+注意私有仓库不能使用：`127.0.0.1`、`localhost` 等，即使是单机使用。因为在 pod 是单点的进程，单独的 IP，不指定 IP 则无法访问私有仓库。
 
 ```
 # 拉取镜像仓库
@@ -144,13 +164,13 @@ docker pull registry
 docker run -d -it --restart=always --name=docker-registry -p 5000:5000 -v /docker/var/lib/registry:/var/lib/registry registry:latest
 
 # 配置私有仓库 /etc/docker/daemon.json
-"insecure-registries":["127.0.0.1:5000"]
+"insecure-registries":["http://10.0.88.85:5000"]
 
 # 镜像重命名， 命名格式为：私有仓库ip:端口/<分类>/镜像:镜像版本
-docker tag kubia:v1.0 127.0.0.1:5000/web/kubia:v1.0
+docker tag kubia:v1.0 10.0.88.85:5000/web/kubia:v1.0
 
 # 推送镜像都私有仓库
-docker push 127.0.0.1:5000/kubia:v1.0
+docker push 10.0.88.85:5000/kubia:v1.0
 ```
 
 > 准备数据
@@ -203,9 +223,31 @@ docker tag kubia k8s_in_action/kubia
 docker push k8s_in_action/kubia 
 ```
 
-##### Kubernetes 
+#### Kubernetes 
 
-###### 安装
+##### Minikube
+
+> Minikube 安装单机 k 8 s 集群
+
+```
+minikube start --driver=docker  --force 
+minikube start --vm-driver=none
+
+minikube delete
+
+minikube node add
+minikube node list
+
+# 启动集群并指定 docker 私有仓库地址，如果不指定则默认使用 https 请求
+minikube delete && minikube start --insecure-registry=10.0.88.85:5000
+```
+
+
+[Minikube 安装和简单使用 - 江湖小小白 - 博客园](https://www.cnblogs.com/jhxxb/p/15220729.html)
+[How to install cri-dockerd and migrate nodes from dockershim](https://www.mirantis.com/blog/how-to-install-cri-dockerd-and-migrate-nodes-from-dockershim)
+[minikube从本地docker registry 拉取镜像的两种方法 | 一线攻城狮](https://researchlab.github.io/2019/08/24/minikube-pull-image-from-docker-registry/)
+
+##### 安装
 
 > 安装 kubelet kubeadm kubectl
 
@@ -275,42 +317,4 @@ systemctl restart containerd
 
 [使用 Kubeadm 部署 | 凤凰架构](https://icyfenix.cn/appendix/deployment-env-setup/setup-kubernetes/setup-kubeadm.html)
 
-
-> minikube 安装单机 k8s 集群
-
-[Minikube 安装和简单使用 - 江湖小小白 - 博客园](https://www.cnblogs.com/jhxxb/p/15220729.html)
-[How to install cri-dockerd and migrate nodes from dockershim](https://www.mirantis.com/blog/how-to-install-cri-dockerd-and-migrate-nodes-from-dockershim)
-
-```
-minikube start --driver=docker  --force 
-minikube start --vm-driver=none
-
-minikube delete
-```
-
-- Docker 启动失败
-
-```
-echo {} > /etc/docker/daemon.json
-service docker restart 
-docker ps
-
-
-vim /etc/docker/daemon.json
-
-{
-	"insecure-registries":["127.0.0.1:5000"],
-	"exec-opts":["native.cgroupdriver=systemd"],
-	"registry-mirrors":[
-			"https://docker.m.daocloud.io",
-			"https://dockerproxy.com",
-			"https://hub.uuuadc.top/",
-			"https://docker.fxxk.dedyn.io/"
-	]
-}
-
-```
-
-
-## Kubernetes 集群
 

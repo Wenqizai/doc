@@ -1,4 +1,4 @@
-## Node
+ ## Node
 
 ```
 # 查看工作节点
@@ -13,19 +13,19 @@ kubectl describe node <nodeName>
 
 ```
 # 启动 pod
-kubectl run <podName> --image=<imageName> --port=8080
+kubectl run <podName> --image=<imageName>:<version> --port=8080 -n <namespace>
 
 # 列出 pod 
-kubectl get pods
+kubectl get pods -n <namespace>
 
 # 查看 pod 描述
-kubectl describe pod <podName>
+kubectl describe pod <podName> -n <namespace>
 
 # 删除 pod 
 kubectl delete pod <pod-name> -n <namespace>
 
 # 查看日志
-kubectl logs <podName>
+kubectl logs <podName> -n <namespace>
 ```
 
 
