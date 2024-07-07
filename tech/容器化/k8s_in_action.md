@@ -149,14 +149,13 @@ Service 被创建时，会获得⼀个静态的 IP，在服务的⽣命周期中
 vim /etc/docker/daemon.json
 
 {
-	"insecure-registries":["http://10.0.88.85:5000"],
-	"exec-opts":["native.cgroupdriver=systemd"],
-	"registry-mirrors":[
-			"https://docker.m.daocloud.io",
-			"https://dockerproxy.com",
-			"https://hub.uuuadc.top/",
-			"https://docker.fxxk.dedyn.io/"
-	]
+    "insecure-registries":["192.168.8.150:5000"],
+    "exec-opts":["native.cgroupdriver=systemd"],
+    "registry-mirrors":[
+            "https://docker.fxxk.dedyn.io",
+            "https://docker.anyhub.us.kg",
+            "https://dockerhub.icu"
+        ]
 }
 ```
 
@@ -172,7 +171,7 @@ vim /etc/docker/daemon.json
 docker pull registry 
 
 # 启动镜像仓库
-docker run -d -it --restart=always --name=docker-registry -p 5000:5000 -v /docker/var/lib/registry:/var/lib/registry registry:latest
+docker run -d -it --restart=always --name=docker-registry -p 5000:5000 -v /docker/var/lib/registry:/var/lib/registry --restart=always registry:latest
 
 # 配置私有仓库 /etc/docker/daemon.json
 "insecure-registries":["http://10.0.88.85:5000"]
