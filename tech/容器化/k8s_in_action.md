@@ -7,6 +7,8 @@
 [Docker: Accelerated Container Application Development](https://www.docker.com/)
 [Kubernetes(K8S)中文文档\_Kubernetes中文社区](http://docs.kubernetes.org.cn/)
 
+[安装minikube · 动手做实验学习K8s · 看云](https://www.kancloud.cn/huowolf/kubernates/1870316)
+
 # 介绍
 
 Kubernetes，希腊语，领航员、舵手的意思。
@@ -110,6 +112,15 @@ Kubernetes 集群有多个工作节点、节点内有多个 Pod，每个 Pod 都
 | `Unknown`（未知）   | 因为某些原因无法取得 Pod 的状态。这种情况通常是因为与 Pod 所在主机通信失败。                               |
 
 [Pod 的生命周期 | Kubernetes](https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/pod-lifecycle/)
+
+### Service 
+
+我们知道 Pod 在健康检查不通过时，或者手工移除，集群中会生成一个新的 Pod，新的 IP 地址。Service 就是用来解决不断变化的 Pod IP 地址问题。可以做到一个固定的 IP 地址对外暴露多个 Pod。 
+
+Service 被创建时，会获得⼀个静态的 IP，在服务的⽣命周期中这个 IP 不会发⽣改变。客户端应该通过固定 IP 地址连接到服务，⽽不是直接连接 pod。服务会确保其中⼀个 pod 接收连接，⽽不关⼼pod 当
+前运⾏在哪⾥（以及它的 IP 地址是什么）。
+
+服务表⽰⼀组或多组提供相同服务的 pod 的静态地址。到达服务 IP 和端口的请求将被转发到属于该服务的⼀个容器的 IP 和端口。
 
 ### Kubernetes 安装运行
 
@@ -319,4 +330,38 @@ systemctl restart containerd
 
 [使用 Kubeadm 部署 | 凤凰架构](https://icyfenix.cn/appendix/deployment-env-setup/setup-kubernetes/setup-kubeadm.html)
 
+##### 安装 kuboard
+
+[安装minikube · 动手做实验学习K8s · 看云](https://www.kancloud.cn/huowolf/kubernates/1870316)
+
+
+
+### 运行
+
+#### 启动 Pod 
+
+- 启动一个 Pod 容器的流程
+
+![[Pod启动流程.png]]
+
+#### 访问 Pod 
+
+我们从架构图可以知道，Pod 在集群内部有自己的 IP，不能直接被集群外部访问，因此需要暴露 Pod 到外部集群访问。
+
+`LoadBalancer`，负载均衡，通过负载均衡的公共 IP 来访问集群内部的 Pod。 
+
+> 1. 创建服务对象
+
+```
+kubectl expose kubia --type=LoadBalancer --name kubia-http
+```
+
+
+> 2. 查看创建的 service 
+
+```
+kubectl get services
+```
+
+针对 minikube 没有 LoadBalancer 服务可使用指令 `minikube service kubia-http` 查看访问 IP。注意此时还不能够通过宿主机 IP 来访问服务。
 
