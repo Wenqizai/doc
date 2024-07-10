@@ -21,6 +21,9 @@ kubectl expose deploy kubia --type=LoadBalancer --name kubia-http
 kubectl get pods -n <namespace>
 kubectl get pods -A
 
+# 查看 pod 所在节点和 IP
+kubectl get pods -o wide
+
 # 查看 pod 描述
 kubectl describe pod <podName> -n <namespace>
 
@@ -38,9 +41,13 @@ kubectl logs <podName> -n <namespace>
 # 查看 deploy
 kubectl get deployments -n <namespace>
 kubectl get deployments -A
+kubectl get deploy
 
 # 删除 deploy 
 kubectl delete deployment <deployment-name> -n <namespace>
+
+# 伸缩 deploy 
+kubectl scale deploy <deployment-name> --replicas=1
 
 
 ```
@@ -60,6 +67,7 @@ get deploy <deployName> -o yaml > temp.yml
 ```
 # 查看服务
 kubectl get services
+kubectl get svc
 
 
 

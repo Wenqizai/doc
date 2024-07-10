@@ -113,7 +113,7 @@ Kubernetes 集群有多个工作节点、节点内有多个 Pod，每个 Pod 都
 
 [Pod 的生命周期 | Kubernetes](https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/pod-lifecycle/)
 
-### Service 
+#### Service 
 
 我们知道 Pod 在健康检查不通过时，或者手工移除，集群中会生成一个新的 Pod，新的 IP 地址。Service 就是用来解决不断变化的 Pod IP 地址问题。可以做到一个固定的 IP 地址对外暴露多个 Pod。 
 
@@ -252,7 +252,10 @@ minikube node add
 minikube node list
 
 # 启动集群并指定 docker 私有仓库地址，如果不指定则默认使用 https 请求
-minikube delete && minikube start --insecure-registry=10.0.88.85:5000
+minikube delete && minikube start --driver=docker  --force --insecure-registry=10.0.88.85:5000 --kubernetes-version=v1.22.14
+
+# minikube 下查看 service 
+minikube service kubia-http
 ```
 
 
@@ -336,15 +339,15 @@ systemctl restart containerd
 
 
 
-### 运行
+##### 运行
 
-#### 启动 Pod 
+###### 启动 Pod 
 
 - 启动一个 Pod 容器的流程
 
 ![[Pod启动流程.png]]
 
-#### 访问 Pod 
+###### 访问 Pod 
 
 我们从架构图可以知道，Pod 在集群内部有自己的 IP，不能直接被集群外部访问，因此需要暴露 Pod 到外部集群访问。
 
@@ -364,4 +367,10 @@ kubectl get services
 ```
 
 针对 minikube 没有 LoadBalancer 服务可使用指令 `minikube service kubia-http` 查看访问 IP。注意此时还不能够通过宿主机 IP 来访问服务。
+
+## Pod
+
+Pod 独立 IP，可以运行多个容器，但只能运行在同一个 Node 中，不可跨节点。
+
+![[Pod不可跨节点.png]]
 
