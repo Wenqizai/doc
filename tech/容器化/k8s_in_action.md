@@ -263,80 +263,14 @@ minikube service kubia-http
 [How to install cri-dockerd and migrate nodes from dockershim](https://www.mirantis.com/blog/how-to-install-cri-dockerd-and-migrate-nodes-from-dockershim)
 [minikube从本地docker registry 拉取镜像的两种方法 | 一线攻城狮](https://researchlab.github.io/2019/08/24/minikube-pull-image-from-docker-registry/)
 
-##### 安装
+##### Kubeadm 
 
-> 安装 kubelet kubeadm kubectl
+参看有道云文档
+##### kuboard
 
-- 配置仓库
-
-```
-cat <<EOF > /etc/yum.repos.d/kubernetes.repo
-[kubernetes]
-name=Kubernetes
-baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
-EOF
-```
-
-- 安装
-
-> Kubeadm
-
-```
-rpm --import https://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
-
-cat <<EOF > /etc/yum.repos.d/kubernetes.repo
-[kubernetes]
-name=Kubernetes
-baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
-EOF
-
-yum update
-
-sudo yum remove -y kubelet kubeadm kubectl
-sudo yum install -y kubelet-1.22.14 kubeadm-1.22.14 kubectl-1.22.14
-
- kubeadm init \
-  --pod-network-cidr=10.244.0.0/16 \
-  --kubernetes-version v1.22.14 \
-  --apiserver-advertise-address 10.0.88.85
-
-sudo swapoff -a
-kubeadm config images list
-
-kubeadm init 
-kubeadm init --image-repository=registry.aliyuncs.com/google_containers
-
-systemctl enable kubelet && systemctl start kubelet
-systemctl status kubelet
-
-```
-
-- Kubeadm init 失败
-
-```
-yum remove containerd
-yum update
-yum install -y containerd.io
-rm /etc/containerd/config.toml
-systemctl restart containerd
-```
-
-[kubeadm init error: CRI v1 runtime API is not implemented — Linux Foundation Forums](https://forum.linuxfoundation.org/discussion/862825/kubeadm-init-error-cri-v1-runtime-api-is-not-implemented)
-
-[使用 Kubeadm 部署 | 凤凰架构](https://icyfenix.cn/appendix/deployment-env-setup/setup-kubernetes/setup-kubeadm.html)
-
-##### 安装 kuboard
+参看有道云文档
 
 [安装minikube · 动手做实验学习K8s · 看云](https://www.kancloud.cn/huowolf/kubernates/1870316)
-
 
 
 ##### 运行
@@ -372,5 +306,10 @@ kubectl get services
 
 Pod 独立 IP，可以运行多个容器，但只能运行在同一个 Node 中，不可跨节点。
 
+**Pod 设计原理**：Docker 和 k8s 都是设计单容器，单进程，而不是单容器多进程。目的，方便进程管理日志、资源等，同时单容器进程崩溃也可以快速自动重启恢复。基于这个设计目的，k8s 设计更高维度的 Pod 来管理这些多容器多进程。
+
 ![[Pod不可跨节点.png]]
 
+> 关于资源隔离
+
+容器资源是相互隔离的，对于 Pod 来说，不需要每个容器资源都相互隔离，需要 Pod 内容器共享 Pod 分配的资源。因此 k8s 通过配置 Docker 让同一个 Pod 内的容器使用相同的 Linux 命名空间，达到 Pod 内容器资源共享。
