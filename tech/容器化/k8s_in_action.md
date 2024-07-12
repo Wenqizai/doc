@@ -174,7 +174,7 @@ vim /etc/docker/daemon.json
 docker pull registry 
 
 # 启动镜像仓库
-docker run -d -it --restart=always --name=docker-registry -p 5000:5000 -v /docker/var/lib/registry:/var/lib/registry --restart=always registry:latest
+docker run -d -it --restart=always --name=docker-registry -p 5000:5000 -v /docker/var/lib/registry:/var/lib/registry registry:latest
 
 # 配置私有仓库 /etc/docker/daemon.json
 "insecure-registries":["http://10.0.88.85:5000"]

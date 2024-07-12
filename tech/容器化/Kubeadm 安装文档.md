@@ -132,14 +132,24 @@ yum update -y --exclude=kernel*
 
 >升级内核
 
-升级内核到 4.18+
+升级内核到 4.18+, 注意: /boot 空间不足时会导致内核安装失败。
+
+清理旧内核：[centos7遇到/boot空间不足的报错，无法进行kernel更新 - EEBONDの博客](https://eebond.github.io/centos7%E9%81%87%E5%88%B0-boot%E7%A9%BA%E9%97%B4%E4%B8%8D%E8%B6%B3%E7%9A%84%E6%8A%A5%E9%94%99%E6%97%A0%E6%B3%95%E8%BF%9B%E8%A1%8Ckernel%E6%9B%B4%E6%96%B0/)
 
 ```
+# 查看已安装内核
+rpm -qa | grep kernel
+# 查看现在使用的内核
+uname -r
+# 查看 /boot 大小
+df -h /boot
+
 cd /root
 # http://193.49.22.109为历史版本地址，想下载5+等高版本可到官方地址https://elrepo.org
 wget http://193.49.22.109/elrepo/kernel/el7/x86_64/RPMS/kernel-ml-devel-4.20.13-1.el7.elrepo.x86_64.rpm
 wget http://193.49.22.109/elrepo/kernel/el7/x86_64/RPMS/kernel-ml-4.20.13-1.el7.elrepo.x86_64.rpm
- 
+
+yum remove -y kernel-ml*
 yum localinstall -y kernel-ml*
  
 # 更改内核启动顺序
@@ -264,6 +274,10 @@ cat > /etc/docker/daemon.json <<EOF
 EOF
  
 # 启动
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo systemctl restart kubelet
+
 systemctl daemon-reload && systemctl enable --now docker
 ```
 
@@ -406,4 +420,148 @@ kubectl apply -f calico.yaml
  
 # 查询节点STATUS 为ready状态则完成
 kubectl get node
+```
+
+> metrics 插件
+
+k8s需要安装metrics实现对自身一些基本指标如CPU和内存用量的获取
+
+如后续要安装prometheus则不需要安装metrics插件。
+
+```
+cd /root 
+
+wget -O metrics-server-components.yaml --no-check-certificate https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+
+sed -i 's/k8s.gcr.io/metrics-server/registry.cn-hangzhou.aliyuncs.com/google_containers/g' metrics-server-components.yaml
+ 
+# 添加kubelet-insecure-tls
+vim metrics-server-components.yaml
+...
+    spec:
+      containers:
+      - args:
+        - --cert-dir=/tmp
+        - --secure-port=4443
+        - --kubelet-preferred-address-types=InternalIP,ExternalIP,Hostname
+        - --kubelet-use-node-status-port
+        - --metric-resolution=15s
+        - --kubelet-insecure-tls    # 添加此项
+...
+ 
+# 安装
+kubectl create -f metrics-server-components.yaml
+
+# 删除
+kubectl delete -f metrics-server-components.yaml
+ 
+# 能获取数据则安装成功
+kubectl top node
+```
+
+> 安装 kuboard
+
+```
+cd /root 
+
+wget https://addons.kuboard.cn/kuboard/kuboard-v3.yaml
+kubectl create -f kuboard-v3.yaml
+ 
+在浏览器中打开链接 http://your-node-ip-address:30080
+用户名： admin
+初始密码： Kuboard123
+```
+
+> 安装 treafik 网关
+
+安装treafik作为ingress控制器，做统一网关功能。
+
+```
+# 安装helm工具
+# helm版本对应k8s版本列表 https://helm.sh/zh/docs/topics/version_skew/
+ 
+cd /root
+mkdir helm && cd helm
+wget https://get.helm.sh/helm-v3.8.2-linux-amd64.tar.gz
+tar -xf helm-v3.8.2-linux-amd64.tar.gz
+mv linux-amd64/helm /usr/local/bin/helm
+rm -rf ./linux-amd64
+ 
+# 通过helm安装treafik
+# 添加traefix仓库
+helm repo add traefik https://helm.traefik.io/traefik
+ 
+# 更新仓库
+helm repo update
+ 
+# 从定义仓库中查找包
+helm search repo traefik --version 10.20.1
+# 下载包当前目录
+helm pull traefik/traefik --version 10.20.1
+ 
+# 修改values.yaml文件
+tar -xf traefik-10.20.1.tgz
+cd traefik
+ 
+# 配置values.yaml
+vim values.yaml
+# 全局参数，开启dashboard,metrics等
+- "--api.dashboard=true"
+- "--metrics.prometheus=true"
+ 
+# 端口暴露配置
+ports:
+  traefik:
+    port: 9000
+    expose: true
+    exposedPort: 9000
+ 
+# 定义ingress入口node的标签（注意如果是control-plane做入口需要配置容忍）
+nodeSelector: {ingress: "treafik"}
+
+# 定义对外服务形式
+service:
+  enabled: true
+  #type: LoadBalancer   # 使用NodePort
+  type: NodePort
+ 
+# 创建traefik命名空间
+kubectl create ns traefik
+ 
+# 创建ingress入口node节点的标签
+kubectl label nodes k8snode1 ingress=treafik
+kubectl label nodes k8snode2 ingress=treafik
+ 
+# 安装traefik（需要进入 traefik 目录执行）
+helm install traefik -n traefik .
+# 更新配置
+# helm upgrade traefik -n traefik .
+# 卸载（需要进入 traefik 目录执行）
+helm uninstall traefik -n traefik
+ 
+# 查询svc
+kubectl get svc -n traefik
+```
+
+
+```
+NAME      TYPE       CLUSTER-IP       EXTERNAL-IP   PORT(S)   AGE
+traefik   NodePort   192.168.109.23   <none> 9000:30176/TCP,80:31833/TCP,443:30037/TCP   12s
+```
+`9000:30176/TCP`：端口 30176 是访问 traefik 的 dashboard 入口， http://10.0.88.85:30176/dashboard
+
+`80:31833/TCP`：端口 31833 是 80 端口的 nodeport 入口，前端 nginx 或负载均匀器转发到 node ip 的这个端口上
+
+`443:30037/TCP`：端口 30037 是 443 端口的 nodeport 入口，前端 nginx 或负载均匀器转发到 node ip 的这个端口上
+
+
+- 容忍配置
+```
+# 容忍执行（master）
+kubectl taint nodes  k8smaster node-role.kubernetes.io/master- 
+kubectl taint nodes --all node-role.kubernetes.io/master-
+
+# 取消容忍
+node/k8smaster untainted
 ```
