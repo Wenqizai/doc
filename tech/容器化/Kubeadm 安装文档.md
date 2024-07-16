@@ -509,6 +509,7 @@ vim values.yaml
 # 全局参数，开启dashboard,metrics等
 - "--api.dashboard=true"
 - "--metrics.prometheus=true"
+- "--api.insecure=true"
  
 # 端口暴露配置
 ports:
@@ -517,8 +518,8 @@ ports:
     expose: true
     exposedPort: 9000
  
-# 定义ingress入口node的标签（注意如果是control-plane做入口需要配置容忍）
-nodeSelector: {ingress: "treafik"}
+# 定义ingress入口node的标签（注意这里是节点选择器, 需要对相应的节点打label才能部署）
+nodeSelector: {"ingress": "traefik"}
 
 # 定义对外服务形式
 service:
@@ -556,12 +557,196 @@ traefik   NodePort   192.168.109.23   <none> 9000:30176/TCP,80:31833/TCP,443:300
 `443:30037/TCP`：端口 30037 是 443 端口的 nodeport 入口，前端 nginx 或负载均匀器转发到 node ip 的这个端口上
 
 
-- 容忍配置
-```
-# 容忍执行（master）
-kubectl taint nodes  k8smaster node-role.kubernetes.io/master- 
-kubectl taint nodes --all node-role.kubernetes.io/master-
+> 安装 ingress-nginx
 
-# 取消容忍
-node/k8smaster untainted
+Ingress-nginx 和 traefix 一样，均是作为网关得入口，两者可以选择其一。
+
+- 下载 deploy.yaml 
+
+```
+cd /root
+
+wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.0/deploy/static/provider/cloud/deploy.yaml
+
+cp deploy.yaml ingress-nginx-deploy.yaml
+```
+
+- 修改 yaml 
+
+```
+apiVersion: v1
+kind: Service
+spec:
+  type: LoadBalancer  # 修改为 NodePort
+
+
+apiVersion: apps/v1
+kind: DaemonSet # Deployment需替换为 DaemonSet。使用 DaemonSet 确保每个节点都部署；
+
+
+apiVersion: apps/v1
+kind: DaemonSet
+spec: 
+  template:
+    spec:
+      hostNetwork: true # 添加这一栏
+      dnsPolicy: ClusterFirst
+
+```
+
+- 部署
+```
+kubectl apply -f deploy.yaml
+
+kubectl get pods -n ingress-nginx
+```
+
+## 关于 taint
+
+正常启动，只有 master 节点有容忍，不允许节点调度到 master。
+
+```
+# 查看容忍
+kubectl describe node | grep Taints
+
+# 输出
+
+Taints:             node-role.kubernetes.io/master:NoSchedule
+Taints:             <none>
+Taints:             <none>
+
+
+# 添加容忍
+kubectl taint nodes k8snode1 node-role.kubernetes.io/master=:NoSchedule
+# 去掉容忍
+kubectl taint nodes k8snode1 node-role.kubernetes.io/master=:NoSchedule-
+```
+
+## 关于 label
+
+正常情况配置了 `nodeSelector: {"ingress": "treafik"}`，相应的 Pod 会调度到对应 label 的 Node 上进行部署。如何没有则调度失败。
+
+```
+# 添加 label
+kubectl label node k8snode1 ingress=traefik
+kubectl label node k8snode2 ingress=traefik
+
+# 去掉 label
+kubectl label node k8snode1 ingress=traefik
+kubectl label node k8snode2 ingress=traefik- 
+```
+
+# 部署可访问服务
+
+## 部署 tomcat
+
+- Deploy + service
+
+```
+# tomcat.ymal
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tomcat
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tomcat
+  template:
+    metadata:
+      labels:
+        app: tomcat
+    spec:
+      containers:
+      - name: tomcat
+        image: tomcat:8.5.34-jre8-alpine
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tomcat
+  namespace: default
+  labels:
+    app: tomcat
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 8080
+  type: NodePort
+  selector:
+    app: tomcat
+```
+
+- Ingress 
+
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-http
+  namespace: default
+spec:
+  ingressClassName: traefix
+  rules:
+  - host: tomcat.123.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tomcat
+            port:
+              number: 80
+```
+## 集群外部署 Nginx
+
+- docker 安装
+```
+docker pull nginx:1.18 
+
+# 新建 nginx 挂载目录
+mkdir -p /usr/local/docker/volume/nginx/conf
+mkdir -p /usr/local/docker/volume/nginx/log
+mkdir -p /usr/local/docker/volume/nginx/html
+
+# 生成挂载日志
+# 生成容器
+docker run --name nginx -p 80:80 -d nginx:1.18 
+# 将容器nginx.conf文件复制到宿主机
+docker cp nginx:/etc/nginx/nginx.conf /usr/local/docker/volume/nginx/conf/nginx.conf
+# 将容器conf.d文件夹下内容复制到宿主机
+docker cp nginx:/etc/nginx/conf.d /usr/local/docker/volume/nginx/conf/conf.d
+# 将容器中的html文件夹复制到宿主机
+docker cp nginx:/usr/share/nginx/html /usr/local/docker/volume/nginx/
+
+docker rm -f <containerId>
+
+# 运行容器
+docker run \
+-p 80:80 \
+--name nginx \
+-v /usr/local/docker/volume/nginx/conf/nginx.conf:/etc/nginx/nginx.conf \
+-v /usr/local/docker/volume/nginx/conf/conf.d:/etc/nginx/conf.d \
+-v /usr/local/docker/volume/nginx/log:/var/log/nginx \
+-v /usr/local/docker/volume/nginx/html:/usr/share/nginx/html \
+-d nginx:1.18
+```
+
+- 配置代理规则
+
+```
+server {
+  listen 80;
+  server_name www.k8s-cluster.com;
+
+  location ~ / {
+    proxy_pass http://tomcat.123.com;
+  }
+}
 ```
