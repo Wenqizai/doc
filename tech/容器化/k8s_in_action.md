@@ -9,6 +9,8 @@
 
 [安装minikube · 动手做实验学习K8s · 看云](https://www.kancloud.cn/huowolf/kubernates/1870316)
 
+[KuboardSpray | Kuboard Spray](https://kuboard-spray.cn/)
+
 # 介绍
 
 Kubernetes，希腊语，领航员、舵手的意思。

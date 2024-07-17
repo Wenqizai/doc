@@ -400,7 +400,7 @@ kubeadm reset
 
 **以下操作均在 Master 节点完成。**
 
-> Calico 网络插件
+### Calico 网络插件
 
 k8s必须安装网络插件才能实现网络互通。
 
@@ -422,7 +422,7 @@ kubectl apply -f calico.yaml
 kubectl get node
 ```
 
-> metrics 插件
+ ### metrics 插件
 
 k8s需要安装metrics实现对自身一些基本指标如CPU和内存用量的获取
 
@@ -460,7 +460,7 @@ kubectl delete -f metrics-server-components.yaml
 kubectl top node
 ```
 
-> 安装 kuboard
+ ### 安装 kuboard
 
 ```
 cd /root 
@@ -473,7 +473,7 @@ kubectl create -f kuboard-v3.yaml
 初始密码： Kuboard123
 ```
 
-> 安装 treafik 网关
+### 安装 treafik 网关
 
 安装treafik作为ingress控制器，做统一网关功能。
 
@@ -557,18 +557,84 @@ traefik   NodePort   192.168.109.23   <none> 9000:30176/TCP,80:31833/TCP,443:300
 `443:30037/TCP`：端口 30037 是 443 端口的 nodeport 入口，前端 nginx 或负载均匀器转发到 node ip 的这个端口上
 
 
-> 安装 ingress-nginx
+### 安装 ingress-nginx
 
 Ingress-nginx 和 traefix 一样，均是作为网关得入口，两者可以选择其一。
 
-- 下载 deploy.yaml 
+[kubernetes学习笔记之七： Ingress-nginx 部署使用 - 百衲本 - 博客园](https://www.cnblogs.com/panwenbin-logs/p/9915927.html)
+
+- 下载部署文件
 
 ```
-cd /root
+cd /root/ingress-nginx
 
-wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.1.0/deploy/static/provider/cloud/deploy.yaml
+wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.20.0/deploy/mandatory.yaml
 
-cp deploy.yaml ingress-nginx-deploy.yaml
+mv mandatory.yaml mandatory-0.20.0.yaml
+
+# 查看需要的镜像, 并手动下载镜像
+vim mandatory-0.20.0.yaml
+
+docker pull dyrnq/defaultbackend-amd64:1.5 
+docker tag dyrnq/defaultbackend-amd64:1.5  k8s.gcr.io/defaultbackend-amd64:1.5
+docker rmi dyrnq/defaultbackend-amd64:1.5 
+
+
+docker pull siriuszg/nginx-ingress-controller:0.20.0
+docker tag siriuszg/nginx-ingress-controller:0.20.0 quay.io/kubernetes-ingress-controller/nginx-ingress-controller:0.20.0
+docker rmi siriuszg/nginx-ingress-controller:0.20.0
+```
+
+- 修改 mandatory-0.20.0. Yaml
+为了适应新版 kubectl，有些 api 已经废弃不适用，需要重新修改。
+
+```
+
+sed -i 's#extensions/v1beta1#apps/v1#g' mandatory-0.20.0.yaml
+
+sed -i 's#rbac.authorization.k8s.io/v1beta1#rbac.authorization.k8s.io/v1#g' mandatory-0.28.0.yaml
+```
+
+- 下载 service.ymal
+如果不需要对外暴露 NodePort 则不需要该文件。
+
+```
+wget   https://raw.githubusercontent.com/kubernetes/ingress-nginx/nginx-0.20.0/deploy/provider/baremetal/service-nodeport.yaml
+
+vim service-nodeport.yaml
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-nginx
+  namespace: ingress-nginx
+  labels:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+spec:
+  type: NodePort
+  ports:
+  - name: http
+    port: 80
+    targetPort: 80
+    protocol: TCP
+    nodePort: 32080
+  - name: https
+    port: 443
+    targetPort: 443
+    protocol: TCP
+    nodePort: 32443
+  selector:
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+
+```
+
+- 启动
+
+```
+kubectl apply -f mandatory-0.20.0.yaml
+kubectl apply -f service-nodeport.yaml
 ```
 
 - 修改 yaml 
