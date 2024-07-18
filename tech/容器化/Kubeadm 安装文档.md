@@ -561,6 +561,12 @@ traefik   NodePort   192.168.109.23   <none> 9000:30176/TCP,80:31833/TCP,443:300
 
 Ingress-nginx 和 traefix 一样，均是作为网关得入口，两者可以选择其一。
 
+k8s v.1.8 之前, ingress-nginx 安装版本为 0.x；k8s v.1.8+, ingress-nginx 安装版本为 1.x
+
+#### 0.x
+
+>Ingress-nginx 0.20.0 版本安装 
+
 [kubernetes学习笔记之七： Ingress-nginx 部署使用 - 百衲本 - 博客园](https://www.cnblogs.com/panwenbin-logs/p/9915927.html)
 
 - 下载部署文件
@@ -637,35 +643,71 @@ kubectl apply -f mandatory-0.20.0.yaml
 kubectl apply -f service-nodeport.yaml
 ```
 
-- 修改 yaml 
+#### 1.x
+
+>Ingress-nginx 1.18 版本安装
+
+安装文档：[kubernetes 部署 Ingress-nginx controller-v1.8.0 - 小吉猫 - 博客园](https://www.cnblogs.com/wangguishe/p/17434752.html)
+
+- 下载部署文件
 
 ```
+wget https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.0/deploy/static/provider/baremetal/deploy.yaml -O ingress-nginx-deploy-v1.8.0.yaml
+```
+
+- 修改暴露端口
+
+```
+vim ingress-nginx-deploy-v1.8.0.yaml
+
 apiVersion: v1
 kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/version: 1.8.0
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
 spec:
-  type: LoadBalancer  # 修改为 NodePort
-
-
-apiVersion: apps/v1
-kind: DaemonSet # Deployment需替换为 DaemonSet。使用 DaemonSet 确保每个节点都部署；
-
-
-apiVersion: apps/v1
-kind: DaemonSet
-spec: 
-  template:
-    spec:
-      hostNetwork: true # 添加这一栏
-      dnsPolicy: ClusterFirst
-
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - appProtocol: http
+    name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+    nodePort: 31080 # 增加暴露端口
+  - appProtocol: https
+    name: https
+    port: 443
+    protocol: TCP
+    targetPort: https
+    nodePort: 31443 # 增加暴露端口
+  selector:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/name: ingress-nginx
+  type: NodePort
 ```
 
-- 部署
+- 替换加速镜像 
 ```
-kubectl apply -f deploy.yaml
+sed -i 's#registry.k8s.io/ingress-nginx/kube-webhook-certgen:v20230407@sha256:543c40fd093964bc9ab509d3e791f9989963021f1e9e4c9c7b6700b02bfb227b#dyrnq/kube-webhook-certgen:v20230407#g' ingress-nginx-deploy-v1.8.0.yaml
 
-kubectl get pods -n ingress-nginx
+sed -i 's#registry.k8s.io/ingress-nginx/controller:v1.8.0@sha256:744ae2afd433a395eeb13dc03d3313facba92e96ad71d9feaafc85925493fee3#dyrnq/controller:v1.8.0#g' ingress-nginx-deploy-v1.8.0.yaml
 ```
+
+- 查看 ingress-nginx 访问的 ip
+
+```
+kubectl get pods -n ingress-nginx -o wide
+```
+
 
 ## 关于 taint
 
@@ -748,27 +790,40 @@ spec:
     app: tomcat
 ```
 
-- Ingress 
+- 配置 Ingress 
+
+截取 /tomcat url 后转发到 tomcat service.
 
 ```
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ingress-http
-  namespace: default
+  name: ingress-myapp
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
-  ingressClassName: traefix
+  ingressClassName: nginx
   rules:
   - host: tomcat.123.com
     http:
       paths:
-      - path: /
-        pathType: Prefix
+      - path: '/tomcat(/|$)(.*)'
+        pathType: ImplementationSpecific
         backend:
           service:
             name: tomcat
             port:
-              number: 80
+              number: 8080
+```
+
+- 配置 ingress 转发的 host 
+
+```
+kubectl get pods -n ingress-nginx -o wide
+
+vim /etc/hosts
+
+192.168.185.228 tomcat.123.com
 ```
 ## 集群外部署 Nginx
 
@@ -808,11 +863,14 @@ docker run \
 
 ```
 server {
-  listen 80;
-  server_name www.k8s-cluster.com;
+    listen 80;
+    server_name tomcat.123.com;
 
-  location ~ / {
-    proxy_pass http://tomcat.123.com;
-  }
+    location /tomcat {
+        proxy_pass http://192.168.185.228:80/tomcat;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
 }
 ```
