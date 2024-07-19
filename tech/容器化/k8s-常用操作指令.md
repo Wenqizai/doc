@@ -60,6 +60,9 @@ kubectl delete -f <yaml>
 
 # 导出 pod 的 yaml, 快速部署
 get deploy <deployName> -o yaml > temp.yml
+
+# 导出 pod 的完整 yaml 
+kubectl get po <podName> -o yaml > temp.yaml
 ```
 
 ## Service
