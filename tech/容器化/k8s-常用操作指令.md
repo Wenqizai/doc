@@ -32,6 +32,13 @@ kubectl delete pod <pod-name> -n <namespace>
 
 # 查看日志
 kubectl logs <podName> -n <namespace>
+# 当 Pod 中有多个容器，可以指定容器查看日志 
+kubectl logs <podName> -c <containerName> -n <namespace>
+
+# 创建 Pod (两者均可创建 Pod，apply 存在则更新，create 存在则报错，apply 更为灵活)
+kubectl apply -f <yaml>
+kubectl create -f <yaml>
+
 ```
 
 
@@ -72,7 +79,9 @@ kubectl get po <podName> -o yaml > temp.yaml
 kubectl get services
 kubectl get svc
 
-
-
+# 如果不想通过 Pod 来暴露端口通信，亦可通过简单的端口转发来通信（仅用在调试）
+kubectl port-forward <podName> 本机端口:Pod 端口
+# 删除端口转发，ctrl + c 或者一下
+ps aux | grep port-forward
 
 ```
