@@ -112,5 +112,9 @@ kubectl get pod -l '!env'
 # 列出指定非指定标签值的 pod （如下例，列出 env 标签值不是 prod 的 pod）
 kubectl get pod -l 'env != prod'
 kubectl get po -l 'env notin (prod)'
+
+# 当然 label 也可以作用与其他资源
+kubectl label node <node_name> <label_key>=<label_value>
+
 ```
 

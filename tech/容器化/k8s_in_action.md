@@ -425,10 +425,57 @@ spec:
 - 包含具有特定键和值的标签；
 - 包含具有特定键的标签，但其值与我们指定的不同。
 
+标签选择器，不单单可以列出相关标签的 pod，也可使通过标签选择器实现一次删除多个 pod。
+
+### Pod 的调度
+
+当没有使用标签选择器时，创建的 pod 都是随机调度到工作节点上。当我们对工作节点打上相应的 label，对应创建的 pod 指定 label 之后就可以调度到指定的 Node。
+
+1. 给 Node 打 label
+
+```
+kubectl label node k8snode1 gpu=true
+```
+
+2. 使用标签选择器调度对应的 pod 
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+	name: kubia-gpu
+spec:
+	nodeSelector: 
+		gpu: "true"
+	containers: 
+	- image: 10.0.88.85:5000/kubia:v1.0
+	  name: kubia 
+	  ports:
+	  - containerPort: 8080
+	  	protocol: TCP
+```
 
 
+3. 指定 Node 调度 pod （不推荐）
 
+每个 Node 节点都有隐含唯一的 label：`kubernetes.io/hostname`，标签值为主机名，用来指定调度到指定的唯一 Node。
 
+**Warning：** 如果将 pod 调度到某个确定的节点。但如果节点处于离线状态，通过 hostname 标签将 **nodeSelector 设置为特定节点可能会导致 pod 不可调度**。我们绝不应该考虑单个节点，⽽是应该通过标签
+选择器考虑符合特定标准的逻辑节点组。
 
-
+```
+apiVersion: v1
+kind: Pod
+metadata:
+	name: kubia-gpu
+spec:
+	nodeSelector: 
+		kubernetes.io/hostname: "k8snode1"
+	containers: 
+	- image: 10.0.88.85:5000/kubia:v1.0
+	  name: kubia 
+	  ports:
+	  - containerPort: 8080
+	  	protocol: TCP
+```
 
