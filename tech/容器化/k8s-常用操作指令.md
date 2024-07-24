@@ -85,3 +85,32 @@ kubectl port-forward <podName> 本机端口:Pod 端口
 ps aux | grep port-forward
 
 ```
+
+## Label
+
+```
+# 查看标签
+kubectl get po --show-labels
+
+# 指定查看特定的标签
+kubectl get po -L <label_key>
+
+# 修改指定 Pod 的标签 
+kubectl label po <podName> <label_key>=<label_value> <--overwrite>
+
+# 删除标签
+kubectl label po <podName> <label_key>-
+
+# 列出指定标签的 pod 
+kubectl get po -l <label_key>=<label_value>
+kubectl get po -l <label_key>
+kubectl get po -l 'env in (prod, debug)'
+
+# 列出非指定标签的 pod (如下例列出非 env 的 pod)
+kubectl get pod -l '!env'
+
+# 列出指定非指定标签值的 pod （如下例，列出 env 标签值不是 prod 的 pod）
+kubectl get pod -l 'env != prod'
+kubectl get po -l 'env notin (prod)'
+```
+

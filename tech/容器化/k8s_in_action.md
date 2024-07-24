@@ -386,6 +386,46 @@ kubectl explain --help
 
 ```
 
+### 标签
+
+标签，是可以附件到资源的任意键值对，用来组织 Pod 和 Kubernetes 资源。只要标签在资源内是唯一的，一个资源就可用拥有多个标签。
+
+我们可以通过组织不同资源不同的标签来完成服务的金丝雀发布，比如：
+
+- app ：指定 Pod 属于哪个应用、组件或微服务；
+- rel ：指定 Pod 运行的应用诚信版本是 stable、beta 还是 canary。 
+
+![[标签组织下的Pod.png]]
+
+> 使用 labels 
+
+创建标签：`creation=luksa/kubia`，`env=prod`
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+	name: kubia-manual-v2
+	labels: 
+		creation_method: manual 
+		env: prod
+spec:
+	containers: 
+	- image: 10.0.88.85:5000/kubia:v1.0
+	  name: kubia 
+	  ports:
+	  - containerPort: 8080
+	  	protocol: TCP
+```
+
+#### 标签选择器
+
+标签是附在资源上的，标签选择器用来选择标记特定标签的 pod，并对这些 pod 执行操作。标签选择器选择的条件：
+- 包含（或不包含）特定键的标签；
+- 包含具有特定键和值的标签；
+- 包含具有特定键的标签，但其值与我们指定的不同。
+
+
 
 
 
