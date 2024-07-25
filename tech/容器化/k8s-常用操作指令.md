@@ -118,3 +118,15 @@ kubectl label node <node_name> <label_key>=<label_value>
 
 ```
 
+## Namespace 
+
+```
+kubectl get ns
+
+kubectl get pod -n <namespaceName>
+
+kubectl create ns <custom-namespace>
+
+# 创建 pod 并指定 namespace
+kubectl apply -f kubia-manual.yaml -n custom-namespace
+```

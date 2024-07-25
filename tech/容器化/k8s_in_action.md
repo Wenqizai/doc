@@ -479,3 +479,76 @@ spec:
 	  	protocol: TCP
 ```
 
+### 注解 Pod 
+
+注解和标签都非常相似，用来标识 Pod 对象信息。但是与标签有所区别的是，注解用来标注 pod 对象信息，而不能像标签一样，参与对象的分组和使用标签选择器来筛选对象。
+
+注解是为单个对象添加说明信息，在创建 pod 时可以指定。
+
+- 查看 pod 的注解
+
+```
+kubectl get po kubia-gpu -o yaml
+```
+
+- 添加/修改注解
+
+```
+# 查看 pod 注解
+kubectl describe pod kubia-gpu
+
+# 修改/添加 pod 注解
+kubectl annotate pod kubia-gpu mycompany.com/someannotation="foo bar" <--overwrite>
+
+# 删除注解
+kubectl annotate pod kubia-gpu mycompany.com/someannotation-
+```
+
+### 命名空间 
+
+命名空间，即 Namespace。我们知道可以使用标签和标签选择器来分组管理 pod 和资源。当我们没有指定标签的话，可以看到所有的 pod 资源。同时 pod 是拥有多个标签的，当我们想要将一些不同标签 pod 组织起来，按照资源进行隔离和管理时，命名空间应运而生。
+
+命名空间下资源名称唯一，不同的命名空间可以拥有相同的资源名称。
+
+> 创建命名空间
+
+```
+vim custom-namespace.yaml
+
+apiVersion: v1
+kind: Namespace
+metadata:
+	name: custom-namespace
+```
+
+> 指定命名空间
+
+```
+# 创建命名空间
+kubectl create ns custom-namespace
+
+# 创建 pod 并指定 namespace
+kubectl apply -f kubia-manual.yaml -n custom-namespace
+```
+
+命名空间，不是开箱即用，实际上命名空间之间并不提供对正在运⾏的对象的任何隔离。比如，命名空间之间是否提供⽹络隔离取决于 Kubernetes 所使⽤的⽹络解决⽅案，并不是创建了该命名空间之后，资源就自动隔离了。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
