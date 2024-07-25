@@ -29,6 +29,7 @@ kubectl describe pod <podName> -n <namespace>
 
 # 删除 pod 
 kubectl delete pod <pod-name> -n <namespace>
+kubectl delete po -l <label-key>=<label-value> -n <namespace>
 
 # 查看日志
 kubectl logs <podName> -n <namespace>
@@ -125,8 +126,11 @@ kubectl get ns
 
 kubectl get pod -n <namespaceName>
 
-kubectl create ns <custom-namespace>
+kubectl create ns <namespaceName>
 
 # 创建 pod 并指定 namespace
 kubectl apply -f kubia-manual.yaml -n custom-namespace
+
+# 删除命名空间， 命名空间下的 pod 也会被删除
+kubectl delete ns <namespaceName>
 ```

@@ -533,12 +533,42 @@ kubectl apply -f kubia-manual.yaml -n custom-namespace
 
 命名空间，不是开箱即用，实际上命名空间之间并不提供对正在运⾏的对象的任何隔离。比如，命名空间之间是否提供⽹络隔离取决于 Kubernetes 所使⽤的⽹络解决⽅案，并不是创建了该命名空间之后，资源就自动隔离了。
 
+### 停止和移除 Pod 
 
+**注意：** 无论是哪种方式删除 pod，都需要执行对应的命名空间。
 
+> 按名称删除
 
+Kubernetes 向进程发送⼀个 SIGTERM 信号并等待⼀定的秒数（默认为 30），使其正常关闭。如果它没有及时关闭，则通过 SIGKILL 终⽌该进程。因此，为了确保你的进程总是正常关闭，进程需要正确处理 SIGTERM 信号。
 
+```
+# 删除单个 
+kubectl delete po kubia-gpu
+# 删除多个 
+kubectl delete po po1 po2 po3
+```
 
+> 按标签选择器删除
 
+```
+kubectl delete po -l creation_method=manual
+```
+
+> 按命名空间删除
+
+```
+# 删除命名空间及其下所有 pod
+kubectl delete ns custom-namespace 
+
+# 保留命名空间，删除所有 pod 
+kubectl delete po --all -n custom-namespace
+```
+
+> 删除命名空间下所有资源 
+
+```
+kubectl delete all --all
+```
 
 
 
