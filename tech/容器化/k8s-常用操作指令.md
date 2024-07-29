@@ -31,11 +31,6 @@ kubectl describe pod <podName> -n <namespace>
 kubectl delete pod <pod-name> -n <namespace>
 kubectl delete po -l <label-key>=<label-value> -n <namespace>
 
-# 查看日志
-kubectl logs <podName> -n <namespace>
-# 当 Pod 中有多个容器，可以指定容器查看日志 
-kubectl logs <podName> -c <containerName> -n <namespace>
-
 # 创建 Pod (两者均可创建 Pod，apply 存在则更新，create 存在则报错，apply 更为灵活)
 kubectl apply -f <yaml>
 kubectl create -f <yaml>
@@ -133,4 +128,17 @@ kubectl apply -f kubia-manual.yaml -n custom-namespace
 
 # 删除命名空间， 命名空间下的 pod 也会被删除
 kubectl delete ns <namespaceName>
+```
+
+## Log 
+
+
+```
+# 查看日志
+kubectl logs <podName> -n <namespace>
+# 当 Pod 中有多个容器，可以指定容器查看日志 
+kubectl logs <podName> -c <containerName> -n <namespace>
+
+# 查看上一个 pod 的日志（通常发生 pod 重启之后）
+kubectl logs <podName> --previous
 ```

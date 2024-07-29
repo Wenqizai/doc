@@ -570,13 +570,124 @@ kubectl delete po --all -n custom-namespace
 kubectl delete all --all
 ```
 
+## 管理 Pod 
 
+Pod 是 Kubernetes 最基本的部署单元，我们可以手动创建、监督和管理它们。但是实际用例中，我们希望创建的 pod 能够保持自动运行、保持健康，无需任何手动干预。通常我们通过创建 ReplicationController 或 Deployment 来创建并管理实际的 pod。 
 
+### Pod 健康
 
+Kubernetes 通过外部检查应用运行状态的方式来检查应用是否可以继续提供服务，决定是否重启该应用。
 
+**为什么选择从外部检测而不是应用内部检测呢？**
 
+应用内部检测可以通过捕获特定的异常来决定应用是否健康，是否退出该进程，比如捕获 OOM 异常，但是没有特定异常并不能说明应用是健康的。比如应用遭遇死循环、死锁等情况，应用也会停止响应。此时就不能依赖于应用的内部检测。
 
+#### LivenessProbe 
 
+**存活探针 liveness probe**
+
+Kubernetes 通过存活指针 liveness probe 来检查容器是否还在运行。可以对 Pod 中的每个容器指定 liveness probe。如果探测失败，kubernetes 将定期执行探针并重新启动容器。
+
+探测容器的三种机制：
+
+- HTTP GET 
+- TCP 套接字
+- Exec 探针
+
+> HTTP GET 
+
+Kubernetes 定期对容器指定的 `ip: port` 执行 HTTP GET。根据响应的状态来判断容器是否存活。
+
+1. 探测成功，HTTP 响应状态码 2xx、3xx；
+2. 探测失败，无响应或错误的响应码
+
+> TCP 
+
+Kubernetes 尝试与容器指定的端口建立 TCP 连接，如果连接成功则探测成功，否则探测失败，容器将被重启。
+
+> Exec 
+
+Kubernetes 在容器内执行任意命令，并检查命令的退出状态码。如果是 0 则探测成功，非 0 的状态码都被认为失败。
+
+#### 创建 LivenessProbe 
+
+- 准备工作
+
+```
+docker pull luksa/kubia-unhealthy:latest
+docker tag luksa/kubia-unhealthy:latest 10.0.88.85:5000/kubia-unhealthy:v1.0
+docker push 10.0.88.85:5000/kubia-unhealthy:v1.0
+docker rmi luksa/kubia-unhealthy:latest
+```
+
+- 创建 Pod kubia-unhealthy
+
+Kubia-unhealthy 是一个不健康的 Node.js 应用，请求改应用会返回 HTTP 状态码 500。
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+	name: kubia-liveness
+spec:
+	containers:
+	- image: 10.0.88.85:5000/kubia-unhealthy:v1.0
+	  name: kubia 
+	  livenessProbe: 
+	  	httpGet: 
+	  		path: / 
+	  		port: 8080
+```
+
+Kubernetes 经过 HTTP 探活请求之后，探测失败则重启容器。
+
+#### LivenessProbe 属性
+
+我们 `describe pod` 之后，我们可以看到 livenessProbe 相关属性： 
+
+```
+Liveness:  http-get http://:8080/ delay=0s timeout=1s period=10s #success=1 #failure=3
+```
+
+- `delay` ：延迟，delay=0s，表示容器启动后立即开始探测；
+
+- `timeout` ：超时，timeout=1s，表示容器必须在 1 秒内进行响应，否则记为失败；
+
+- `period` ：周期，period=10s，表示每 10 秒探测一次容器，连续 3 次失败后重启容器。（failure = 3）
+
+**设置初始延迟**
+
+没有初始延迟，Kubernetes 会在启动时就开始探测容器，此时应用还没准备好接收请求，通常会记为探测失败。
+
+所以合理设置初始延迟是很有必要的。
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+	name: kubia-liveness
+spec:
+	containers:
+	- image: 10.0.88.85:5000/kubia-unhealthy:v1.0
+	  name: kubia 
+	  livenessProbe: 
+	  	httpGet: 
+	  		path: / 
+	  		port: 8080
+	  	initialDelaySeconds: 15
+```
+
+### LivenessProbe 的探测
+
+存活探针的目的是，探测一个应用是否健康，是否可以正常响应，所以需要根据一些原则来选择一个核实的存活探针。
+
+- 指定探针的路径，如 `/healthy`，无需认证，避免认证失败导致重启；
+
+- 探测应用的内部，而没有外部因素的影响。比如数据库连接失败，此时探针返回失败反复重启应用是无法解决数据库连接失败的问题的；
+
+- 保持探针轻量，存活探针不应消耗太多计算资源，不应运行过长时间。探针运行频率很高，会占用应用 CPU 资源；
+
+- 无需在探针中实现重试循环，如上述，Kubernetes 已经实现了循环探测和失败阈值，无需再探针逻辑中二次实现。
 
 
 
