@@ -677,7 +677,7 @@ spec:
 	  	initialDelaySeconds: 15
 ```
 
-### LivenessProbe 的探测
+#### LivenessProbe 的探测
 
 存活探针的目的是，探测一个应用是否健康，是否可以正常响应，所以需要根据一些原则来选择一个核实的存活探针。
 
@@ -687,7 +687,38 @@ spec:
 
 - 保持探针轻量，存活探针不应消耗太多计算资源，不应运行过长时间。探针运行频率很高，会占用应用 CPU 资源；
 
-- 无需在探针中实现重试循环，如上述，Kubernetes 已经实现了循环探测和失败阈值，无需再探针逻辑中二次实现。
+- 无需在探针中实现重试循环，如上述，Kubernetes 已经实现了循环探测和失败阈值，无需再探针逻辑 L中二次实现。
+
+#### LivenessProbe 机制
+
+Kubernetes 在容器崩溃或探针探测失败时，会重启容器来保持运行。承接该任务时 Pod 所在 Worker Node 的 kubelet 来执行，而 Master 上运行的 Kubernetes Control Plane 组件没有参与此过程。
+
+意味着，**Worker Node 发生崩溃时**，没有 Kubernetes Control Plane 管理的 Pod 都会连同崩溃，而此时 LivenessProbe 也是失去作用，因为它是依赖于 Worker Node 的。
+
+因此，我们需要使用 ReplicationController 或类似机制管理 Pod，当 Pod 停止运行时，会在其他的 Worker Node 自动创建 Pod 的替代品，满足高可用要求。
+
+### ReplicationController
+
+ReplicationController 是一种 Kubernetes 资源，**用来保证 Pod 始终保持在运行状态**。如果 Pod 因为任何原因消失（比如节点从集群中消失或由于改 pod 已从节点中逐出），则 ReplicationController 会注意到缺少了 Pod 并创建替代 Pod。 
+
+ReplicationContrller 旨在创建和管理一个 Pod 的多个副本（replicas）。
+
+
+如图：Pod A 直接创建，Pod B 被 ReplicationController 托管的。当节点 1 发生崩溃时，被托管的 Pod B 会自动在节点 2 创建新的 Pod。
+
+![[ReplicationController管理的Pod.png|550]]
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
