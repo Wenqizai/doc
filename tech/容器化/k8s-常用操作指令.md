@@ -142,3 +142,44 @@ kubectl logs <podName> -c <containerName> -n <namespace>
 # 查看上一个 pod 的日志（通常发生 pod 重启之后）
 kubectl logs <podName> --previous
 ```
+
+## ReplicationController 
+
+```
+# 查看 rc 信息
+kubectl get rc 
+
+# 描述 rc 信息
+kubectl describe rc <name>
+
+# 修改 rc 
+kubectl edit rc <name>
+
+# 修改数量
+kubectl scale rc <name> --replicas=10
+
+# 删除 rc, 不删除管理的 pod
+kubectl delete rc kubia --cascade=false
+
+# 删除 rc, 并删除管理的 pod
+kubectl delete rc kubia
+```
+
+## Explain 
+
+```
+# 查看资源文档
+kubectl explain <resource>
+kubectl explain pod
+
+# 查看资源字段信息
+kubectl explain <resource>.<field>
+kubectl explain pod.spec
+
+# 查看资源版本信息 
+kubectl explain <resource> --api-version=<version>
+kubectl explain pod.spec.containers
+
+# 查看资源帮助信息
+kubectl explain --help
+```

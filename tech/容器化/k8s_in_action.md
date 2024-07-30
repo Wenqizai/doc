@@ -708,11 +708,108 @@ ReplicationContrller 旨在创建和管理一个 Pod 的多个副本（replicas�
 
 ![[ReplicationController管理的Pod.png|550]]
 
+**ReplicationController 如何确定 Pod 数量的？**
 
+ReplicationController 是根据 Pod 是否匹配某个标签选择器来确定 Pod 的数量的。主要工作是确保指定 Pod 的数量于标签选择器的数量匹配。否则 ReplicationController 将根据所需来协调 Pod 的数量。 
 
+![[ReplicationController协调Pod.png]]
 
+流程主要涉及 3 个部分：
 
+-  `Label selector（标签选择器）`：用于确定 ReplicationController 作用域中有哪些 Pod；
+-  `replica count（副本个数）`：指定应运行的 Pod 数量；
+-  `pod template（pod 模板）`：用于创建新的 Pod 副本。
 
+![[ReplicationController组成.png]]
+
+> 更改标签选择器和 Pod 模板
+
+两者的更改对现有的 Pod 没有影响，但会使现有的 Pod 脱离 ReplicationController 的范围，不再被管理。
+
+在创建 pod 后，ReplicationController 也不关⼼其 pod 的实际“内容”（容器镜像、环境变量及其他）。因此，Pod 模板仅影响由此 ReplicationController 创建的新 pod。可以将其视为创建新 pod 的曲奇切模
+（cookie cutter）。
+
+#### ReplicationController 操作
+
+- 创建一个 ReplicaionCotroller 
+
+```
+vim kubia-rc.yaml
+
+apiVersion: v1
+kind: ReplicationController 
+metadata:
+  name: kubia
+spec:
+  replicas: 3
+  selector:
+    app: kubia 
+  template: 
+    metadata: 
+      labels: 
+      	app: kubia
+    spec: 
+      containers:
+      - image: 10.0.88.85:5000/kubia:v1.0
+        name: kubia
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+```
+
+**注意：** ReplicationController 创建的 Pod 并不绑定于该 ReplicationController。ReplicationCotroller 是通过标签选择器来筛选 Pod 的，意味着 Pod 修改标签之后亦可以影响到 ReplicationController 作用域的添加或删除，设置可以移动到另外一个 ReplicationController 作用域。
+
+尽管⼀个 pod 没有绑定到⼀个 ReplicationController，但该 pod在 `metadata.OwnerReferences` 字段中引⽤它，可以轻松使⽤它来找到⼀个 Pod 属于哪个 ReplicationController。
+
+> 移出 / 移入  ReplicationController
+
+```
+# 1. 先移除标签 app=kubia， 观察变化
+kubectl label pod <podName> app=foo --overwrite 
+ or
+kubectl label pod <podName> app=kubia-
+
+# 2. 再添加标签 app=kubia， 观察变化
+kubectl label pod <podName> app=kubia
+
+kubectl get po --show-labels
+```
+
+#### ReplicationController 修改
+
+- 修改 rc yaml 中的 label 和 pod template 的 label
+
+```
+# 使用 vim 编辑器
+export KUBE_EDITOR=vim
+
+# 编辑 rc
+kubectl edit rc kubia
+```
+
+- 伸缩数量
+
+```
+kubectl scale rc kubia --replicas=5
+```
+
+ReplicationController 的修改并不会影响到现有的 pod，只会对新的 Pod 生效。同时 ReplicationController 管理的 Pod 标签选择器满足某一个标签即可，无需全部标签都满足。
+
+![[ReplicationController修改.png]]
+
+> 删除 ReplicationController 
+
+```
+# 删除 rc, 不删除管理的 pod
+kubectl delete rc kubia --cascade=false
+
+# 删除 rc, 并删除管理的 pod
+kubectl delete rc kubia
+```
+
+如图，删除 ReplicationController 后，pod 如脱缰野马。但很多是否我们可能需要将这些 pod 从 ReplicationController 到 ReplicationController 的替换，中间不中断 Pod 的运行，此时需要借助其他组件 ReplicaSet。
+
+![[ReplicationController删除.png]]
 
 
 
