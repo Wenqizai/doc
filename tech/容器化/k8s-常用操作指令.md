@@ -143,6 +143,18 @@ kubectl logs <podName> -c <containerName> -n <namespace>
 kubectl logs <podName> --previous
 ```
 
+## ReplicaSet 
+
+```
+# 查看 rs 
+kubectl get rs
+# 查看 rs 描述
+kubectl describe rs <name>
+
+... 其他指令可参考 rc，行为一致 ...
+
+```
+
 ## ReplicationController 
 
 ```
@@ -182,4 +194,15 @@ kubectl explain pod.spec.containers
 
 # 查看资源帮助信息
 kubectl explain --help
+```
+
+## API 
+
+```
+# 查看 kubectl api 
+kubectl api-resources 
+
+# 比如
+kubectl api-resources | grep deployment
+kubectl api-resources | grep replicaSet
 ```

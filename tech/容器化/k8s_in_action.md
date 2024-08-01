@@ -811,13 +811,91 @@ kubectl delete rc kubia
 
 ![[ReplicationController删除.png]]
 
+### ReplicaSet 
+
+ReplicaSet 的提出，就是完全替代掉 ReplicationController 的。正常情况下，我们也不会直接创建 ReplicaSet，而是创建更高层次的 Deployment。
+
+> 比较 ReplicaSet 和 ReplicationController 
+
+- ReplicaSet 和 ReplicationController 行为完全相同；
+
+- Pod 选择能力不同，ReplicationController 只能选择包含特定标签；ReplicaSet 可以选择匹配缺少某个标签的 Pod 和特定标签；
 
 
+比如，ReplicationController 无法同时选中标签，`env=production` 和 `env=devel`。
+
+#### 创建 ReplicaSet
+
+ReplicaSet 不属于 v1 版本一部分，属于 apps API 组的 v1beta2 版本。`matchLabels` 用来匹配标签。
+
+```
+vim kubia-replicaset.yaml
 
 
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: kubia
+spec:
+  replicas: 3
+  selector: 
+  	matchLabels: 
+      app: kubia
+  template:
+    metadata:
+      labels:
+        app: kubia
+    spec:
+      containers:
+      - image: 10.0.88.85:5000/kubia:v1.0
+        name: kubia
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+```
+
+#### ReplicaSet 标签选择器 
+
+一个强大的标签选择器 `matchExpressions`。
+
+```
+vim kubia-replicasetmatchexpressions.yaml
 
 
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: kubia
+spec:
+  replicas: 3
+  selector: 
+	matchExpressions: 
+	  - key: app 
+	    operator: In
+	    values: 
+	      - kubia
+  template:
+    metadata:
+      labels:
+        app: kubia
+    spec:
+      containers:
+      - image: 10.0.88.85:5000/kubia:v1.0
+        name: kubia
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+```
 
+MatchExpressions 表达式，包含 key，operator（运算符），values（列表）。
 
+其中的运算符：
+- `In`： Label 的值必须与其中一个指定的 values 匹配；
 
+- `NotIn`：Label 的值与任何指定的 values 不匹配；
 
+- `Exists`：Pod 必须包含⼀个指定名称的标签（值不重要）。使⽤此运算符时，不应指定 values 字段；
+
+- `DoesNotExist`:  Pod 不得包含有指定名称的标签。values 属性不得指定。
+
+如果使用多表达式，`matchLabels` 和 `matchExpressions`，那么两者的关系必须为 true，指定的规则才生效。
