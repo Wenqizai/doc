@@ -143,6 +143,10 @@ kubectl logs <podName> -c <containerName> -n <namespace>
 kubectl logs <podName> --previous
 ```
 
+## DaemonSet
+
+指令可参考 rc、rs。
+
 ## ReplicaSet 
 
 ```
@@ -205,4 +209,17 @@ kubectl api-resources
 # 比如
 kubectl api-resources | grep deployment
 kubectl api-resources | grep replicaSet
+```
+
+## Job 
+
+```
+# 查看 job 
+kubectl get jobs
+
+# 删除 job 
+kubectl delete job <jobName>
+
+# 修改 job 参数
+kubectl edit job <jobName>
 ```

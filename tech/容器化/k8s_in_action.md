@@ -971,3 +971,157 @@ kubectl label node k8snode2 disk=hdd --overwrite
 ```
 kubectl delete ds
 ```
+
+### Job
+
+ReplicationController、ReplicaSet 和 DaemonSet 都是持续运行任务，遇到某些条件也会触发重启机制。对于一些只会运行一次的任务，这里就会用到 Job。Job 对于一些临时任务的应用很有用。
+
+Job，运行的 Pod 在内部进程运行成功结束时，不重启容器，一旦任务完成，该 Pod 就被认为处于完成状态。
+
+当发生故障时，该节点上由 Job 管理的 Pod 将按照 ReplicaSet 处理 Pod 形式，重新在其他节点启动 Pod。
+如果进程本身异常退出（进程返回错误退出代码时），可以将 Job 配置为重新启动容器。
+
+#### 创建 Job 
+
+- 准备镜像
+
+```
+docker pull luksa/batch-job:latest
+docker tag luksa/batch-job:latest 10.0.88.85:5000/batch-job:v1.0
+docker push 10.0.88.85:5000/batch-job:v1.0
+docker rmi luksa/batch-job:latest
+
+```
+
+- 定义 Job 
+
+配置重启策略：`restartPolicy: OnFailure`，默认的重启策略是：`restartPolicy: always`，永远重启策略显然不适用于 Job。
+
+```
+vim exporter.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: batch-job
+spec:
+  template:
+    metadata:
+      labels:
+        app: batch-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - image: 10.0.88.85:5000/batch-job:v1.0
+        name: main
+```
+
+- 运行多个 Pod 实例 
+
+> 顺序执行
+
+`completions: 5`，表示这个作业顺序运行 5 个实例。
+
+```
+vim multi-completion-batch-job.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: multi-completion-batch-job
+spec:
+  completions: 5
+  template:
+    metadata:
+      labels:
+        app: batch-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - image: 10.0.88.85:5000/batch-job:v1.0
+        name: main
+```
+
+Job 将顺序创建执行一个个 Pod，第一个运行完成时，再开始创建下一个，直至创建到指定的 Pod 数量。当某一个 Pod 发生异常时，也会创建新的 Pod，意味着 Pod 的数量可以超出指定的数量。
+
+>并行执行
+
+```
+vim multi-completion-parallel-batch-job.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: multi-completion-parallel-batch-job
+spec:
+  completions: 5
+  parallelism: 2
+  template:
+    metadata:
+      labels:
+        app: batch-job
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - image: 10.0.88.85:5000/batch-job:v1.0
+        name: main
+```
+
+设置 `parallelism: 2`，同时可以创建 2 个 Pod 一起运行，如果其中一个 Pod 运行结束则开始运行下一个 Pod，直至指定 Pod 数量都运行完毕。
+
+> 限定 Job 的运行时间和重试次数
+
+```
+# 限制 pod 的时间
+jobs.spec.activeDeadlineSeconds
+
+# 限制 pod 可以重试次数
+jobs.spec.backoffLimit
+```
+
+#### 定期Job CronJob 
+
+Job 会再创建时立即运行 Pod，如果需要定期执行或指定时刻执行某一项任务，这时就会用到 CronJob。CronJob 会以指定的 cron 表达式来运行 job。 
+
+**创建 CronJob**
+
+每 15 分钟调度一次 Pod。
+
+```
+vim cronjob.yaml 
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: batch-job-every-fifteen-minutes
+spec:
+  schedule: "0,15,30,45 * * * *"
+  jobTemplate: 
+  	spec:   
+  	  startingDeadlineSeconds: 15
+	  template:
+	    metadata:
+	      labels:
+	        app: periodic-batch-job
+	    spec:
+	      restartPolicy: OnFailure
+	      containers:
+	      - image: 10.0.88.85:5000/batch-job:v1.0
+	        name: main
+```
+
+- 指定 Pod 在预定时间之内执行，否则记为 Failed。
+
+```
+jobs.spec.startingDeadlineSeconds: 15
+```
+
+
+
+
+
+
+
+
+
+
