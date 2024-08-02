@@ -899,3 +899,75 @@ MatchExpressions 表达式，包含 key，operator（运算符），values（列
 - `DoesNotExist`:  Pod 不得包含有指定名称的标签。values 属性不得指定。
 
 如果使用多表达式，`matchLabels` 和 `matchExpressions`，那么两者的关系必须为 true，指定的规则才生效。
+
+### DaemonSet
+
+ReplicationController 和 ReplicaSet 都是用于在 Kubernetes 集群上部署指定数量的 Pod。当我们要在每个 Node 上都要运行一个 Pod 示例时，DaemonSet 就应运而生。
+
+DaemonSet 的场景应用：日志收集器、资源监控器等，比如 kube-proxy 进程就需要在运行在所有节点上才能服务工作。
+
+
+![[DaemonSet的副本运行.png|450]]
+
+DaemonSet 期望在所有的 Node 上创建 Pod，所以它不需要指定 Pod 的数量，默认就是节点的数量。当节点下线，DaemonSet 不会在其他地方重新创建 Pod。如果新的节点上线，DaemonSet 也会立刻在新节点上部署新的 Pod。
+
+当节点上的 Pod 被删除时，与 rc 和 rs 一样，DaemonSet 也会在配置的 Pod 模板上创建新的 Pod。
+
+**特点节点运行 DaemonSet**
+
+我们知道 DaemonSet 默认可以在所有的节点上运行 Pod。不过我们也可以通过配置 Pod 模板中的 nodeSelector 属性指定，DaemonSet 在部分节点上运行。
+
+> Demo 
+
+创建一个运行 ssd-monitor 的监控器进程 DaemonSet，该进程每 5 秒会将 “SSD OK” 打印到标准输出。
+
+- 准备镜像
+```
+docker pull luksa/ssd-monitor:latest
+docker tag luksa/ssd-monitor:latest 10.0.88.85:5000/ssd-monitor:v1.0
+docker push 10.0.88.85:5000/ssd-monitor:v1.0
+docker rmi luksa/ssd-monitor:latest
+```
+
+- 准备 yaml 
+
+```
+vim ssd-monitor-daemonset.yaml
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: ssd-monitor
+spec:
+  selector: 
+	matchLabels: 
+	  app: ssd-monitor
+  template:
+    metadata:
+      labels:
+        app: ssd-monitor
+    spec:
+      nodeSelector: 
+      	disk: ssd 
+      containers:
+      - image: 10.0.88.85:5000/ssd-monitor:v1.0
+        name: main
+```
+
+- 给节点打标签
+
+Master 节点因为容忍度不允许调度 Pod，即使 Master 打上标签，DaemonSet 也不会进行调度。
+
+```
+kubectl label node k8snode1 disk=ssd 
+kubectl label node k8snode2 disk=ssd
+
+# 删除 ssd 标签
+kubectl label node k8snode2 disk=hdd --overwrite 
+```
+
+- 删除 DaemonSet 
+
+```
+kubectl delete ds
+```
