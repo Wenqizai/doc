@@ -1133,7 +1133,7 @@ Service，当服务存在时，service 的 IP 地址和端口不会改变，客�
 
 ## Service 创建与发现
 
-**创建 Service**
+>**创建 Service**
 
 Service 也是通过标签选择器来确定哪些 Pod 是和 Service 同一组的。Service 创建可以通过指令 `kubectl expose` 或 Kubernetes API 来创建。
 
@@ -1148,21 +1148,134 @@ metadata:
   name: kubia 
 spec:
   ports: 
-    - port: 80 
-      targetPort: 8080
-    selector:
-      app: kubia
+  - port: 80 
+    targetPort: 8080
+  selector:
+    app: kubia
 ```
 
+>**对 Service 发送 curl 请求会发生什么?**
 
+- 相关信息 
 
+```
+[root@k8smaster ~]# kubectl get pod
+NAME                      READY   STATUS    RESTARTS   AGE
+kubia-lt22m               1/1     Running   0          5d
+kubia-rwgnz               1/1     Running   0          5d
+kubia-vkljp               1/1     Running   0          5d
 
+[root@k8smaster ~]# kubectl get svc
+NAME         TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)    AGE
+kubernetes   ClusterIP   192.168.0.1      <none>        443/TCP    26d
+kubia        ClusterIP   192.168.156.89   <none>        80/TCP     5d
+tomcat       ClusterIP   192.168.79.29    <none>        8080/TCP   21d
+```
 
+启动 3 个 Pod，创建一个 service，集群地址是 `192.168.156.89`。进入一个 Pod 执行 curl 请求，如下指令：
 
+```
+kubectl exec kubia-lt22m -- curl -s http://192.168.156.89
+```
 
+多执行几遍，发现 3 个 Pod 轮询响应消息。具体流程如下图：
 
+![[file-20240807160042373.png]]
 
+>**service 的亲和性**
 
+默认情况下，对 service 发送请求会轮询所有的 Pod。如果想要指定某一个 Pod 进行响应，这时可以用到亲和性属性 `sessionAffinity`。
 
+```
+vim kubia-affinity-svc.yaml
 
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia-affinity 
+spec:
+  sessionAffinity: ClientIP
+  ports: 
+  - port: 81
+	targetPort: 8080
+  selector:
+	app: kubia
+```
 
+ - 执行以下指令 
+
+```
+kubectl exec kubia-lt22m -- curl -s http://192.168.137.148:81
+```
+
+`sessionAffinity` 属性有三个值：
+
+- **None**：客户端请求会被随机分配到后端 Pod；
+- **ClientIP**：根据客户端 IP 地址将请求路由到同一个后端 Pod。
+
+>**同一个服务暴露多个端口**
+
+通常 Web 服务暴露端口有 http 80，https 443 端口。我们就可以通过配置 service 来暴露转发到不同的端口。
+
+如下配置：
+
+```
+vim kubia-svc.yaml
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia 
+spec:
+  ports: 
+  - name: http
+    port: 80 
+    targetPort: 8080
+  - name: https
+    port: 443 
+    targetPort: 8443
+  selector:
+    app: kubia
+```
+
+>**使用映射端口服务**
+
+- 创建 Pod 时指定端口名称 
+
+```
+vim 
+
+apiVersion: v1
+kind: Pod 
+spec: 
+ containers: 
+ - name: kubia 
+   ports: 
+   - name: http
+     containerPort: 8080
+   - name: https
+    containerPort: 8443
+```
+
+- 创建 service 时，使用端口映射
+
+```
+vim kubia-svc-pod.yaml
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia 
+spec:
+  ports: 
+  - name: http
+    port: 80 
+    targetPort: http
+  - name: https
+    port: 443 
+    targetPort: https
+  selector:
+    app: kubia
+```
+
+使用端口映射的好处时，但 Pod 端口发生变更时，无需修改 service 的 targetPort。
