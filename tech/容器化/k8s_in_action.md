@@ -11,6 +11,8 @@
 
 [KuboardSpray | Kuboard Spray](https://kuboard-spray.cn/)
 
+[YAML 语言教程 - 阮一峰的网络日志](https://www.ruanyifeng.com/blog/2016/07/yaml.html)
+
 # 介绍
 
 Kubernetes，希腊语，领航员、舵手的意思。
@@ -308,7 +310,7 @@ kubectl get services
 
 针对 minikube 没有 LoadBalancer 服务可使用指令 `minikube service kubia-http` 查看访问 IP。注意此时还不能够通过宿主机 IP 来访问服务。
 
-## Pod
+# Pod
 
 Pod 独立 IP，可以运行多个容器，但只能运行在同一个 Node 中，不可跨节点。
 
@@ -570,7 +572,7 @@ kubectl delete po --all -n custom-namespace
 kubectl delete all --all
 ```
 
-## 管理 Pod 
+# Pod 管理 
 
 Pod 是 Kubernetes 最基本的部署单元，我们可以手动创建、监督和管理它们。但是实际用例中，我们希望创建的 pod 能够保持自动运行、保持健康，无需任何手动干预。通常我们通过创建 ReplicationController 或 Deployment 来创建并管理实际的 pod。 
 
@@ -1115,6 +1117,45 @@ spec:
 ```
 jobs.spec.startingDeadlineSeconds: 15
 ```
+
+# Service 
+
+Service，提供 Pod 与 Pod 之间通信，Pod 与集群外之间通信等服务。Pod 地址是可变的，Pod 与 Pod 之间，Pod 与集群外的 IP 地址也是变化的。Service 就是负责他们之间的通信。
+
+Service，当服务存在时，service 的 IP 地址和端口不会改变，客户端通过 IP 和端口建立连接，路由到提供该服务的任意一个 Pod 上。
+
+如下图：
+
+外部客户端通过前端服务 `1.1.1.1` 进去 Kubernetes 集群；
+前端 Pod 通过后端服务 `1.1.1.2` 与后端相关 Pod 进行通信。
+
+![[应用服务的架构.png]]
+
+## Service 创建与发现
+
+**创建 Service**
+
+Service 也是通过标签选择器来确定哪些 Pod 是和 Service 同一组的。Service 创建可以通过指令 `kubectl expose` 或 Kubernetes API 来创建。
+
+如下：Service 可用端口是 80，服务转发到 Pod 的端口是 8080，标签是 `app=kubia` 属于该服务。
+
+```
+vim kubia-svc.yaml
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia 
+spec:
+  ports: 
+    - port: 80 
+      targetPort: 8080
+    selector:
+      app: kubia
+```
+
+
+
 
 
 

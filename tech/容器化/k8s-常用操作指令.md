@@ -35,6 +35,9 @@ kubectl delete po -l <label-key>=<label-value> -n <namespace>
 kubectl apply -f <yaml>
 kubectl create -f <yaml>
 
+# 执行 Pod 终端命令, -- 代表 kubectl 命令结束，之后输入终端命令
+kubectl exec <podName> -- <command>
+
 ```
 
 
