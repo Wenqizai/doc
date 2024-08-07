@@ -1131,7 +1131,7 @@ Service，当服务存在时，service 的 IP 地址和端口不会改变，客�
 
 ![[应用服务的架构.png]]
 
-## Service 创建与发现
+## Service 创建
 
 >**创建 Service**
 
@@ -1279,3 +1279,8 @@ spec:
 ```
 
 使用端口映射的好处时，但 Pod 端口发生变更时，无需修改 service 的 targetPort。
+
+## Service 发现 
+
+Service 和 Pod 的创建顺序并不是固定的，那么客户端 Pod 是如何发现 Service 地址的，进行通信的。
+
