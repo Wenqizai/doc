@@ -1180,7 +1180,7 @@ kubectl exec kubia-lt22m -- curl -s http://192.168.156.89
 
 多执行几遍，发现 3 个 Pod 轮询响应消息。具体流程如下图：
 
-![[file-20240807160042373.png]]
+![[指令curl在service中流转.png]]
 
 >**service 的亲和性**
 
@@ -1305,7 +1305,7 @@ Kubernetes 在命名空间 `kube-system` 中启动作为 DNS 服务器的 Pod，
 
 **注意：** 是否使用集群内 DNS 服务器解析，是根据属性 `pod.spec.dnsPolicy` 来决定。
 
-![[file-20240809100510664.png|500]]
+![[coredns-yaml说明.png|500]]
 
 ### FQDN 连接
 
@@ -1341,6 +1341,131 @@ kubectl exec kubia-blqsq -- curl -s http://kubia:80
 ```
  kubectl exec kubia-blqsq -- cat /etc/resolv.conf
 ```
+
+## Service 访问集群外部
+
+上述可以知道，Pod 通过访问 service，由 service 负责重定向转发到其他 Pod，达到 Pod 之间相互发现的效果。
+
+那么如果不让 service 重定向到集群内的 Pod，而是重定向到集群外的的应用服务呢，打通内部 Pod 与外部的通信，那么是如何做到？
+
+### EndPoint 
+
+其实 Service 并不是直接与 Pod 连接的，而是通过中间资源 EndPoint 进行连接。使用命令 `kubectl describe svc` 可以查看 endPoint。  
+
+```
+[root@k8smaster ~]# kubectl describe svc kubia
+Name:              kubia
+Namespace:         default
+Labels:            <none>
+Annotations:       <none>
+Selector:          app=kubia
+Type:              ClusterIP
+IP Family Policy:  SingleStack
+IP Families:       IPv4
+IP:                192.168.63.191
+IPs:               192.168.63.191
+Port:              http  80/TCP
+TargetPort:        8080/TCP
+Endpoints:         192.168.185.251:8080,192.168.249.10:8080,192.168.249.18:8080
+Port:              https  443/TCP
+TargetPort:        8443/TCP
+Endpoints:         192.168.185.251:8443,192.168.249.10:8443,192.168.249.18:8443
+Session Affinity:  None
+Events:            <none>
+
+[root@k8smaster ~]# kubectl get pod -o wide
+NAME                      READY   STATUS    RESTARTS   AGE   IP                NODE       NOMINATED NODE   READINESS GATES
+kubia-blqsq               1/1     Running   0          76m   192.168.249.10    k8snode1   <none>           <none>
+kubia-m6xk4               1/1     Running   0          76m   192.168.185.251   k8snode2   <none>           <none>
+kubia-tdt4d               1/1     Running   0          76m   192.168.249.18    k8snode1   <none>           <none>
+
+```
+
+如上，Endpoints 记录每一个 Pod 的访问地址和端口。service 在启动时，会根据标签选择器匹配的 Pod，构建 IP 和端口列表存储到 endpoints 中。
+
+```
+kubectl get endpoints kubia
+```
+
+### EndPoint 配置 
+
+如果 service 没有配置 Pod 标签选择器，那么 service 启动后并不会构建相关的 endpoint 列表。此时我们可以手动配置 endpoints 资源。 
+
+> 创建无标签选择器的 service 
+
+```
+vim external-service.yaml
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: external-service 
+spec:
+  ports: 
+  - port: 80 
+```
+
+>为无标签选择器的 service 创建 endpoints 
+
+**注意：name 必须匹配对应的 service 名称。**
+
+此时，访问 service 时会重定向地址到 `10.0.88.85:5000`，配置多个 ip 将会有负载均衡效果。
+
+```
+vim external-service-endpoints.yaml
+
+apiVersion: v1
+kind: Endpoints  
+metadata:
+  name: external-service 
+subsets: 
+  - addresses: 
+    - ip: 10.0.88.85
+    - ip: 11.11.11.11
+    ports: 
+    - port: 5000 
+```
+
+执行
+
+```
+curl -s http://<service ip:port>/v2/_catalog
+curl -s http://192.168.114.13:80/v2/_catalog
+```
+
+此时，集群内的 Pod 可以通过 service 和 endpoints 来访问集群外的 ip `11.11.11.11` 和 `22.22.22.22`。
+
+![[Endpoints暴露外部服务.png]]
+ 
+### Service ExternalName 
+
+除了手动配置服务的 Endpoint 来代替公开外部服务方法。有一种更简单的方法，就是通过其完全限定域名（FQDN）访问外部服务。
+
+- 创建 ExternalName 类型服务 
+
+创建具有别名的外部服务的 service 时，需要指定 `spec.type` 为 `ExternalName`。
+
+```
+vim external-service-externalname.yaml
+
+apiVersion: v1
+kind: Service  
+metadata:
+  name: external-service 
+spec: 
+  type: ExternalName 
+  externalName: www.baidu.com
+    ports: 
+    - port: 80 
+```
+
+配置完成之后，Pod 可以通过 `external-service.default.svc.cluster.local` 或 `external-service` 进行访问。
+
+目前 `www.baidu.com` 还是访问不了，因为还没配置 https。
+
+
+
+
 
 
 
