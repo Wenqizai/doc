@@ -314,7 +314,7 @@ kubectl get services
 
 Pod 独立 IP，可以运行多个容器，但只能运行在同一个 Node 中，不可跨节点。
 
-### Pod 简介
+## Pod 简介
 
 **Pod 设计原理**：Docker 和 k8s 都是设计单容器，单进程，而不是单容器多进程。目的，方便进程管理日志、资源等，同时单容器进程崩溃也可以快速自动重启恢复。基于这个设计目的，k8s 设计更高维度的 Pod 来管理这些多容器多进程。
 
@@ -336,7 +336,7 @@ Pod 之间是分布在不同节点，拥有不同的 IP，资源相互独立的�
 
 单 Pod 单容器的架构设计，可以快速实现扩缩容，利用多节点优势。
  
-### 创建 Pod 
+## 创建 Pod 
 
 > Pod 的 yaml 定义
 
@@ -388,7 +388,7 @@ kubectl explain --help
 
 ```
 
-### 标签
+## 标签
 
 标签，是可以附件到资源的任意键值对，用来组织 Pod 和 Kubernetes 资源。只要标签在资源内是唯一的，一个资源就可用拥有多个标签。
 
@@ -420,7 +420,7 @@ spec:
 	  	protocol: TCP
 ```
 
-#### 标签选择器
+### 标签选择器
 
 标签是附在资源上的，标签选择器用来选择标记特定标签的 pod，并对这些 pod 执行操作。标签选择器选择的条件：
 - 包含（或不包含）特定键的标签；
@@ -429,7 +429,7 @@ spec:
 
 标签选择器，不单单可以列出相关标签的 pod，也可使通过标签选择器实现一次删除多个 pod。
 
-### Pod 的调度
+## Pod 的调度
 
 当没有使用标签选择器时，创建的 pod 都是随机调度到工作节点上。当我们对工作节点打上相应的 label，对应创建的 pod 指定 label 之后就可以调度到指定的 Node。
 
@@ -481,7 +481,7 @@ spec:
 	  	protocol: TCP
 ```
 
-### 注解 Pod 
+## 注解 Pod 
 
 注解和标签都非常相似，用来标识 Pod 对象信息。但是与标签有所区别的是，注解用来标注 pod 对象信息，而不能像标签一样，参与对象的分组和使用标签选择器来筛选对象。
 
@@ -506,7 +506,7 @@ kubectl annotate pod kubia-gpu mycompany.com/someannotation="foo bar" <--overwri
 kubectl annotate pod kubia-gpu mycompany.com/someannotation-
 ```
 
-### 命名空间 
+## 命名空间 
 
 命名空间，即 Namespace。我们知道可以使用标签和标签选择器来分组管理 pod 和资源。当我们没有指定标签的话，可以看到所有的 pod 资源。同时 pod 是拥有多个标签的，当我们想要将一些不同标签 pod 组织起来，按照资源进行隔离和管理时，命名空间应运而生。
 
@@ -535,7 +535,7 @@ kubectl apply -f kubia-manual.yaml -n custom-namespace
 
 命名空间，不是开箱即用，实际上命名空间之间并不提供对正在运⾏的对象的任何隔离。比如，命名空间之间是否提供⽹络隔离取决于 Kubernetes 所使⽤的⽹络解决⽅案，并不是创建了该命名空间之后，资源就自动隔离了。
 
-### 停止和移除 Pod 
+## 停止和移除 Pod 
 
 **注意：** 无论是哪种方式删除 pod，都需要执行对应的命名空间。
 
@@ -576,7 +576,7 @@ kubectl delete all --all
 
 Pod 是 Kubernetes 最基本的部署单元，我们可以手动创建、监督和管理它们。但是实际用例中，我们希望创建的 pod 能够保持自动运行、保持健康，无需任何手动干预。通常我们通过创建 ReplicationController 或 Deployment 来创建并管理实际的 pod。 
 
-### Pod 健康
+## Pod 健康
 
 Kubernetes 通过外部检查应用运行状态的方式来检查应用是否可以继续提供服务，决定是否重启该应用。
 
@@ -584,7 +584,7 @@ Kubernetes 通过外部检查应用运行状态的方式来检查应用是否可
 
 应用内部检测可以通过捕获特定的异常来决定应用是否健康，是否退出该进程，比如捕获 OOM 异常，但是没有特定异常并不能说明应用是健康的。比如应用遭遇死循环、死锁等情况，应用也会停止响应。此时就不能依赖于应用的内部检测。
 
-#### LivenessProbe 
+### LivenessProbe 
 
 **存活探针 liveness probe**
 
@@ -611,7 +611,7 @@ Kubernetes 尝试与容器指定的端口建立 TCP 连接，如果连接成功�
 
 Kubernetes 在容器内执行任意命令，并检查命令的退出状态码。如果是 0 则探测成功，非 0 的状态码都被认为失败。
 
-#### 创建 LivenessProbe 
+### 创建 LivenessProbe 
 
 - 准备工作
 
@@ -643,7 +643,7 @@ spec:
 
 Kubernetes 经过 HTTP 探活请求之后，探测失败则重启容器。
 
-#### LivenessProbe 属性
+### LivenessProbe 属性
 
 我们 `describe pod` 之后，我们可以看到 livenessProbe 相关属性： 
 
@@ -679,7 +679,7 @@ spec:
 	  	initialDelaySeconds: 15
 ```
 
-#### LivenessProbe 的探测
+### LivenessProbe 的探测
 
 存活探针的目的是，探测一个应用是否健康，是否可以正常响应，所以需要根据一些原则来选择一个核实的存活探针。
 
@@ -691,7 +691,7 @@ spec:
 
 - 无需在探针中实现重试循环，如上述，Kubernetes 已经实现了循环探测和失败阈值，无需再探针逻辑 L中二次实现。
 
-#### LivenessProbe 机制
+### LivenessProbe 机制
 
 Kubernetes 在容器崩溃或探针探测失败时，会重启容器来保持运行。承接该任务时 Pod 所在 Worker Node 的 kubelet 来执行，而 Master 上运行的 Kubernetes Control Plane 组件没有参与此过程。
 
@@ -699,7 +699,7 @@ Kubernetes 在容器崩溃或探针探测失败时，会重启容器来保持运
 
 因此，我们需要使用 ReplicationController 或类似机制管理 Pod，当 Pod 停止运行时，会在其他的 Worker Node 自动创建 Pod 的替代品，满足高可用要求。
 
-### ReplicationController
+## ReplicationController
 
 ReplicationController 是一种 Kubernetes 资源，**用来保证 Pod 始终保持在运行状态**。如果 Pod 因为任何原因消失（比如节点从集群中消失或由于改 pod 已从节点中逐出），则 ReplicationController 会注意到缺少了 Pod 并创建替代 Pod。 
 
@@ -731,7 +731,7 @@ ReplicationController 是根据 Pod 是否匹配某个标签选择器来确定 P
 在创建 pod 后，ReplicationController 也不关⼼其 pod 的实际“内容”（容器镜像、环境变量及其他）。因此，Pod 模板仅影响由此 ReplicationController 创建的新 pod。可以将其视为创建新 pod 的曲奇切模
 （cookie cutter）。
 
-#### ReplicationController 操作
+### ReplicationController 操作
 
 - 创建一个 ReplicaionCotroller 
 
@@ -777,7 +777,7 @@ kubectl label pod <podName> app=kubia
 kubectl get po --show-labels
 ```
 
-#### ReplicationController 修改
+### ReplicationController 修改
 
 - 修改 rc yaml 中的 label 和 pod template 的 label
 
@@ -813,7 +813,7 @@ kubectl delete rc kubia
 
 ![[ReplicationController删除.png]]
 
-### ReplicaSet 
+## ReplicaSet 
 
 ReplicaSet 的提出，就是完全替代掉 ReplicationController 的。正常情况下，我们也不会直接创建 ReplicaSet，而是创建更高层次的 Deployment。
 
@@ -826,7 +826,7 @@ ReplicaSet 的提出，就是完全替代掉 ReplicationController 的。正常�
 
 比如，ReplicationController 无法同时选中标签，`env=production` 和 `env=devel`。
 
-#### 创建 ReplicaSet
+### 创建 ReplicaSet
 
 ReplicaSet 不属于 v1 版本一部分，属于 apps API 组的 v1beta2 版本。`matchLabels` 用来匹配标签。
 
@@ -856,7 +856,7 @@ spec:
           protocol: TCP
 ```
 
-#### ReplicaSet 标签选择器 
+### ReplicaSet 标签选择器 
 
 一个强大的标签选择器 `matchExpressions`。
 
@@ -902,7 +902,7 @@ MatchExpressions 表达式，包含 key，operator（运算符），values（列
 
 如果使用多表达式，`matchLabels` 和 `matchExpressions`，那么两者的关系必须为 true，指定的规则才生效。
 
-### DaemonSet
+## DaemonSet
 
 ReplicationController 和 ReplicaSet 都是用于在 Kubernetes 集群上部署指定数量的 Pod。当我们要在每个 Node 上都要运行一个 Pod 示例时，DaemonSet 就应运而生。
 
@@ -974,7 +974,7 @@ kubectl label node k8snode2 disk=hdd --overwrite
 kubectl delete ds
 ```
 
-### Job
+## Job
 
 ReplicationController、ReplicaSet 和 DaemonSet 都是持续运行任务，遇到某些条件也会触发重启机制。对于一些只会运行一次的任务，这里就会用到 Job。Job 对于一些临时任务的应用很有用。
 
@@ -983,7 +983,7 @@ Job，运行的 Pod 在内部进程运行成功结束时，不重启容器，一
 当发生故障时，该节点上由 Job 管理的 Pod 将按照 ReplicaSet 处理 Pod 形式，重新在其他节点启动 Pod。
 如果进程本身异常退出（进程返回错误退出代码时），可以将 Job 配置为重新启动容器。
 
-#### 创建 Job 
+### 创建 Job 
 
 - 准备镜像
 
@@ -1081,7 +1081,7 @@ jobs.spec.activeDeadlineSeconds
 jobs.spec.backoffLimit
 ```
 
-#### 定期Job CronJob 
+### 定期Job CronJob 
 
 Job 会再创建时立即运行 Pod，如果需要定期执行或指定时刻执行某一项任务，这时就会用到 CronJob。CronJob 会以指定的 cron 表达式来运行 job。 
 
@@ -1283,4 +1283,113 @@ spec:
 ## Service 发现 
 
 Service 和 Pod 的创建顺序并不是固定的，那么客户端 Pod 是如何发现 Service 地址的，进行通信的。
+
+### 环境变量 
+
+查看 Pod 的环境变量：
+
+```
+kubectl exec kubia-blqsq -- env
+```
+
+**注意：** 这种情况适合于 service 先于 pod 创建，pod 才能查看到 service 相关环境变量。
+
+
+### DNS 发现 
+
+Kubernetes 在命名空间 `kube-system` 中启动作为 DNS 服务器的 Pod，其标签为 `kube-dns`。
+
+1. **Kubelet 配置**，当集群启动时，kebelet 会自动将 CoreDNS 的 Service IP 地址配置到 Pod 的 `/etc/resolv.conf` 文件中,作为 Pod 的默认 DNS 服务器。
+2. **Kubernetes Service**，Pod 可以通过 Service 的 DNS 名称 `kube-dns.kube-system.svc.cluster.local` 来访问 CoreDNS 服务； 
+3. **DNS 解析**，当 Pod 内部的应用程序发起 DNS 查询时,查询会被路由到 CoreDNS 服务,CoreDNS 会根据 Kubernetes 中的服务发现信息进行 DNS 解析。
+
+**注意：** 是否使用集群内 DNS 服务器解析，是根据属性 `pod.spec.dnsPolicy` 来决定。
+
+![[file-20240809100510664.png|500]]
+
+### FQDN 连接
+
+Pod 可以通过以下的连接来访问 service 服务。 
+
+```
+<serviceName>.<nameSpace>.svc.cluster.local
+
+kubia.default.svc.cluster.local 
+```
+
+- `kubia`：代表 service 名称；
+- `default`：代表 service 所在的 nameSpace；
+- `svc.cluster.local`：代表所在集群本地服务名称中使用的可配置集群域后缀。
+
+**注意：** 从此 Pod 只是知道 service 的 IP 地址，端口还是需要知道，并指定的。
+
+> Demo 
+
+如果访问 Pod 与被访问 Pod 在同⼀个命名空间下，可以省略 `svc.cluster.local` 后缀，甚⾄命名空间。
+
+```
+# 通过集群 service ip 访问 
+kubectl exec kubia-blqsq -- curl -s http://192.168.63.191:80
+
+kubectl exec kubia-blqsq -- curl -s http://kubia.default.svc.cluster.local:80
+kubectl exec kubia-blqsq -- curl -s http://kubia.default:80
+kubectl exec kubia-blqsq -- curl -s http://kubia:80
+```
+
+可以省略的原因是 `/etc/resolv.conf` 被修改和配置。如下命令可以查看：
+
+```
+ kubectl exec kubia-blqsq -- cat /etc/resolv.conf
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

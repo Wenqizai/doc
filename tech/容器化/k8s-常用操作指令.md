@@ -30,13 +30,11 @@ kubectl describe pod <podName> -n <namespace>
 # 删除 pod 
 kubectl delete pod <pod-name> -n <namespace>
 kubectl delete po -l <label-key>=<label-value> -n <namespace>
+kubectl delete po --all
 
 # 创建 Pod (两者均可创建 Pod，apply 存在则更新，create 存在则报错，apply 更为灵活)
 kubectl apply -f <yaml>
 kubectl create -f <yaml>
-
-# 执行 Pod 终端命令, -- 代表 kubectl 命令结束，之后输入终端命令
-kubectl exec <podName> -- <command>
 
 ```
 
@@ -225,4 +223,15 @@ kubectl delete job <jobName>
 
 # 修改 job 参数
 kubectl edit job <jobName>
+```
+
+## Bash
+
+```
+# 执行 Pod 终端命令, -- 代表 kubectl 命令结束，之后输入终端命令
+kubectl exec <podName> -- <command>
+
+# 查看 pod 环境变量
+kubectl exec <podName> -- env
+
 ```
