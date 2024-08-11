@@ -1470,7 +1470,7 @@ spec:
 集群外部访问 Service 的三种方式：
 
 1. NodePort 
-2. LoadBalance 
+2. LoadBalancer
 3. Ingress 
 
 ⚠️upload failed, check dev console
@@ -1503,15 +1503,49 @@ spec:
 `nodePort` 端口可不指定，将会有 Kubernetes 随机分配。
 
 ⚠️upload failed, check dev console
-![[NodePort的请求转发.png]]
+![[NodePort的请求转发流程.png]]
 
 由 NodePort 的请求流转图可以知道，外部客户端通过节点 IP + 端口来将流量转发到集群的所有节点中。但是这种方式强绑定的某个节点 IP。那么当该节点挂了，外部客户端将无法访问到集群的其他节点。
 
-此时，LoadBalance 应运而生。
+此时，LoadBalancer 应运而生。
 
-### LoadBalance 
+### LoadBalancer 
 
-LoadBalance 是 NodePort 类型的一种扩展，可以使 Service 通过一个专用的负载均衡器来访问。负载均衡器将流量重定向到跨所有节点的节点端口，客户端通过负载均衡器的 IP 连接到服务。
+LoadBalancer 是 NodePort 类型的一种扩展，可以使 Service 通过一个专用的负载均衡器来访问。负载均衡器将流量重定向到跨所有节点的节点端口，客户端通过负载均衡器的 IP 连接到服务。
+
+LoadBalancer 的负载均衡器是从 Kubernetes 集群的基础架构中获取的，如果基础架构不支持。则 LoadBalancer 退化成 NodePort，因为 LoadBalancer 本身就是 NodePort 的扩展。
+
+```
+vim kubia-svc-loadbalancer.yaml
+
+apiVersion: v1
+kind: Service  
+metadata:
+  name: kubia-loadbalancer 
+spec: 
+  type: LoadBalancer 
+  ports: 
+  - port: 80 
+    targetPort: 8080 
+    nodePort: 30123
+  selector: 
+    app: kubia
+```
+
+因为本次采用 VM 搭建的 Kubernetes 集群，不支持 LoadBalancer 服务，仅支持 NodePort 和 Ingress 两种类型的 Service。
+
+⚠️upload failed, check dev console
+![[Loadbancer的请求转发流程.png]]
+
+
+
+**Web 会话的亲和性**
+
+当浏览器访问某一个 NodePort 连接时，当转换不同的节点 IP 之后，浏览器仍然访问的时原来的节点应用服务，即使没有设置亲和性，却表现出会话的亲和性。
+
+浏览器使⽤ `keep-alive` 连接，并通过单个连接发送所有请求，⽽curl 每次都会打开⼀个新连接。服务在连接级别⼯作，所以当⾸次打开与服务的连接时，会选择⼀个随机集群，然后将属于该连接的所有⽹络数据包全部发送到单个集群。即使会话亲和性设置为 None，⽤户也会始终使⽤相同的 Pod（直到连接关）。
+
+
 
 
 
