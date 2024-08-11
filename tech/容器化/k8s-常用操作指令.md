@@ -82,6 +82,9 @@ kubectl port-forward <podName> 本机端口:Pod 端口
 # 删除端口转发，ctrl + c 或者一下
 ps aux | grep port-forward
 
+# 查看 ingress 
+kubectl get ing
+
 ```
 
 ## Label

@@ -1603,12 +1603,38 @@ spec:
 
 Ingress，通过一个 IP 地址公开多个服务。其运行在 HTTP 层（网络协议第 7 层）上，可以提供比工作在第 4 层的服务更多的功能。
 
+Ingress，可以通过匹配路径的方式，将请求转发到不同的 service 中，再由 service 转发到每一个 Pod。
 
+⚠️upload failed, check dev console
+![[Ingress暴露多个service.png]]
 
+Ingress 控制器必须在集群中运行，Ingress 资源才能正常工作。不同的 Kubernetes 环境使用不同的控制器实现。
 
+>创建 Ingress 资源
 
+```
+vim kubia-ingress.yaml
 
+apiVersion: networking.k8s.io/v1
+kind: Ingress  
+metadata:
+  name: kubia 
+spec: 
+  ingressClassName: nginx
+  rules: 
+  - host: kubia.example.com 
+  	http: 
+  	  paths: 
+      - pathType: Prefix
+  	    path: /
+        backend: 
+          service: 
+            name: kubia-nodeport
+            port: 
+              number: 80
+```
 
+以上配置解释： Ingress 控制器收到的所有请求主机 `kubia.example.com` 的 HTTP 请求，将被发送到端⼜80 上的 kubia-nodeport 服务。
 
 
 
