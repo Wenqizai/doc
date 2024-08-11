@@ -1619,19 +1619,42 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress  
 metadata:
   name: kubia 
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
 spec: 
-  ingressClassName: nginx
   rules: 
   - host: kubia.example.com 
-  	http: 
-  	  paths: 
-      - pathType: Prefix
-  	    path: /
+    http: 
+      paths: 
+      - pathType: ImplementationSpecific
+        path: /
         backend: 
           service: 
             name: kubia-nodeport
             port: 
               number: 80
+```
+
+> 配置 hosts 
+
+- 查看 ingress-controller ip
+
+```
+# 查看 ingress-controller ip 地址
+kubectl get po -n ingress-nginx -o wide
+
+NAME                                       READY   STATUS      RESTARTS   AGE   IP               NODE       NOMINATED NODE   READINESS GATES
+ingress-nginx-admission-create-d8kg4       0/1     Completed   0          22d   172.16.185.195   k8snode2   <none>           <none>
+ingress-nginx-controller-b447bb46b-sntt9   1/1     Running     0          22d   172.16.249.4     k8snode1   <none>           <none>
+
+```
+
+- 配置 hosts 
+
+```
+vim /etc/hosts 
+
+172.16.249.4 kubia.example.com
 ```
 
 以上配置解释： Ingress 控制器收到的所有请求主机 `kubia.example.com` 的 HTTP 请求，将被发送到端⼜80 上的 kubia-nodeport 服务。
