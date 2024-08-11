@@ -1545,10 +1545,60 @@ spec:
 
 浏览器使⽤ `keep-alive` 连接，并通过单个连接发送所有请求，⽽curl 每次都会打开⼀个新连接。服务在连接级别⼯作，所以当⾸次打开与服务的连接时，会选择⼀个随机集群，然后将属于该连接的所有⽹络数据包全部发送到单个集群。即使会话亲和性设置为 None，⽤户也会始终使⽤相同的 Pod（直到连接关）。
 
+**减少不必要的网络跳数**
+
+当我们使用 NodePort 连接时，我们知道跳转到的 Pod 不一定是我们访问节点所在的 Pod。为了减少网络跳转到其他节点的 Pod 的网络跳数，我们可以通过以下的配置，每次访问都是访问 IP 的所在节点的 Pod，减少网络跳数：
+
+```
+spec: 
+  externalTrafficPolicy: Local
+```
+
+但是这样的配置也带来一些负面效果：
+
+1. 使用负载均衡器时，转发到的节点没有在本地运行 Pod，连接将会被挂起，不会被转发到其他 Pod。所以需要确保负载均衡器连接转发到至少有一个 Pod 的节点上。
+2. 流量不均衡，转发连接是以节点作为转发，非 Pod 数量转发，会带来以下的流量不均衡的现象。
+
+⚠️upload failed, check dev console
+![[Loadbalancer不均衡的转发流量.png]]
+
+**无客户端 IP 记录**
+
+当节点端⼜接收到连接时，由于对数据包执⾏了源⽹络地址转换（SNAT），因此数据包的源 IP 将发⽣更改。此时连接的 Pod 将获取不到实际客户端连接的 IP。
+
+`spec.ExternalTrafficPolicy.Local ` 外部流量策略会保留客户端 IP，因为在接收连接的节点和托管⽬标 Pod 的节点之间没有额外的跳跃（不执⾏ SNAT）。
 
 
+> 关于 chatGPT 对于 SNAT 的一段回答
 
+```markdown
+在 Kubernetes 中，SNAT（Source Network Address Translation）通常在以下场景中发生，导致 Pod 获取不到外部客户端的真实 IP：
 
+### 1. **Kubernetes Service 使用 ClusterIP**
+
+- 当外部客户端通过 `Service` 的 `ClusterIP` 访问 Pod 时，Kubernetes 可能会对请求进行 SNAT 处理，将外部客户端的 IP 替换为节点的 IP 或者某个内部 IP，从而导致 Pod 获取不到外部客户端的真实 IP。
+- 这种情况发生在 kube-proxy 处理的情况下，它可能会将请求的源地址替换成节点 IP，以确保流量能够正确返回。
+
+### 2. **通过 NodePort 或 LoadBalancer 访问 Pod**
+
+- 当外部流量通过 `NodePort` 或 `LoadBalancer` 进入集群时，如果配置不当，可能会进行 SNAT 操作，导致源 IP 被替换为节点 IP 或负载均衡器的 IP。
+- 默认情况下，某些云提供商的负载均衡器会进行 SNAT，以便能够正确地将响应返回给客户端。
+
+### 3. **跨节点的 Pod-to-Pod 通信**
+
+- 在跨节点的 Pod-to-Pod 通信场景下，Kubernetes 网络插件或 kube-proxy 可能会对流量进行 SNAT 操作，以确保数据包能顺利返回。此时，目标 Pod 看到的源 IP 是 SNAT 后的 IP，而不是原始 Pod 的 IP。
+
+### 4. **使用 Ingress 控制器**
+
+- 如果使用了某些 Ingress 控制器（例如 NGINX Ingress 控制器），它们可能会对请求进行 SNAT 操作，特别是在启用了代理模式的情况下。这也会导致 Pod 无法看到外部客户端的真实 IP。
+
+### **如何获取真实客户端 IP**
+
+- **通过 `X-Forwarded-For` 头部**：当发生 SNAT 时，可以通过 `X-Forwarded-For` 头部获取真实的客户端 IP。许多反向代理或负载均衡器（例如 NGINX）在转发请求时，会将客户端的真实 IP 加入到该头部。
+- **设置 `externalTrafficPolicy`**：如果使用 `NodePort` 或 `LoadBalancer` 类型的 Service，可以将 `externalTrafficPolicy` 设置为 `Local`，这样流量不会被 SNAT，Pod 可以获取到外部客户端的真实 IP。
+
+这些场景下，了解 SNAT 的工作原理和配置选项可以帮助你更好地管理和控制网络流量的行为。
+```
 ### Ingress 
 
 Ingress，通过一个 IP 地址公开多个服务。其运行在 HTTP 层（网络协议第 7 层）上，可以提供比工作在第 4 层的服务更多的功能。
