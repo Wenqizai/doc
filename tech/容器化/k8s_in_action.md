@@ -1463,6 +1463,76 @@ spec:
 
 目前 `www.baidu.com` 还是访问不了，因为还没配置 https。
 
+## 集群外部访问 Service
+
+我们已经知道 Pod 与 Pod 之间、Pod 与外部客户端之间的访问方式。现在就来补充外部客户端访问集群内部 Pod 的方式。
+
+集群外部访问 Service 的三种方式：
+
+1. NodePort 
+2. LoadBalance 
+3. Ingress 
+
+⚠️upload failed, check dev console
+![[外部访问Service.png]]
+
+### NodePort 
+
+将服务类型设置未 NodePort，会在每个集群节点上都会打开一个端口。该端口上接收到的流量重定向到基础 Service，而该 Service 仅在内部集群 IP 和端口上才可以访问，单也可以通过所有节点上的专用端口访问。
+
+NodePort，在所有的节点上设置的端口都是相同的端口，并将连接转发给作为服务的部分 Pod。NodePort 类型 Service 和常规 Service 一样，可以通过 ClusterIP 进行访问通信。同时 NodePort 可以支持节点 IP + Port 的方式来访问到该 NodePort Service。
+
+
+```
+vim kubia-svc-nodeport.yaml
+
+apiVersion: v1
+kind: Service  
+metadata:
+  name: kubia-nodeport
+spec: 
+  type: NodePort
+  ports: 
+  - port: 80 
+    targetPort: 8080 
+    nodePort: 30123
+  selector: 
+    app: kubia
+```
+
+`nodePort` 端口可不指定，将会有 Kubernetes 随机分配。
+
+⚠️upload failed, check dev console
+![[NodePort的请求转发.png]]
+
+由 NodePort 的请求流转图可以知道，外部客户端通过节点 IP + 端口来将流量转发到集群的所有节点中。但是这种方式强绑定的某个节点 IP。那么当该节点挂了，外部客户端将无法访问到集群的其他节点。
+
+此时，LoadBalance 应运而生。
+
+### LoadBalance 
+
+LoadBalance 是 NodePort 类型的一种扩展，可以使 Service 通过一个专用的负载均衡器来访问。负载均衡器将流量重定向到跨所有节点的节点端口，客户端通过负载均衡器的 IP 连接到服务。
+
+
+
+### Ingress 
+
+Ingress，通过一个 IP 地址公开多个服务。其运行在 HTTP 层（网络协议第 7 层）上，可以提供比工作在第 4 层的服务更多的功能。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

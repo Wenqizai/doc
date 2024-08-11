@@ -75,6 +75,7 @@ kubectl get po <podName> -o yaml > temp.yaml
 # 查看服务
 kubectl get services
 kubectl get svc
+kubectl get svc <serviceName>
 
 # 如果不想通过 Pod 来暴露端口通信，亦可通过简单的端口转发来通信（仅用在调试）
 kubectl port-forward <podName> 本机端口:Pod 端口
