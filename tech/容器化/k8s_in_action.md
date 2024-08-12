@@ -1610,6 +1610,8 @@ Ingress，可以通过匹配路径的方式，将请求转发到不同的 servic
 
 Ingress 控制器必须在集群中运行，Ingress 资源才能正常工作。不同的 Kubernetes 环境使用不同的控制器实现。
 
+#### 创建 Ingress 
+
 >创建 Ingress 资源
 
 ```
@@ -1659,19 +1661,121 @@ vim /etc/hosts
 
 以上配置解释： Ingress 控制器收到的所有请求主机 `kubia.example.com` 的 HTTP 请求，将被发送到端⼜80 上的 kubia-nodeport 服务。
 
+#### Ingress 工作流
 
+> Ingress 工作流程 
 
+上述，我们只是创建了 Ingress service 但是外部请求并不是直接和 Ingress service 连通的，而是通过控制器 IngressController。
 
+1. 客户端 DNS 查找，此时 DNS 需要找到 IngressControler 的 IP 地址；
+2. 客户端向 IngressController 发送 HTTP 请求，Header 指定 `host:kubia.example.com` ；
+3. IngressController 寻找匹配的 Ingress service，通过关联的 Endpoints 获取到 Pod 的 IP、端口等； 
+4. IngressController 将请求转发到其中的一个 Pod。 
 
+**注意：**
+1. IngressController 不会将请求转发到 Ingress service，而是转发到其中一个 Pod。 
+2. IngressController 必须存在于集群中，故 IngressController 在集群外是不可访问的（不同节点可以 Ping 通），因此集群外访问 IngressController 必须经过一层转发，比如 Nginx 等代理服务器。
 
+![[Ingress工作流程.png]]
 
+#### Ingress 多域名和多服务
 
+由 Ingress 的创建文件可以知道，Ingress 属性 host 和 path 都是数组类型，因此也可以支持多域名、多 service 的配置。
 
+```
+apiVersion: networking.k8s.io/v1
+kind: Ingress  
+metadata:
+  name: kubia 
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec: 
+rules: 
+- host: kubia.example.com 
+  http: 
+    paths: 
+    - path: /kubia
+      pathType: ImplementationSpecific
+      backend: 
+        service: 
+          name: kubia-nodeport
+          port: 
+            number: 80
+    - path: /foo
+    pathType: ImplementationSpecific
+    backend: 
+      service: 
+        name: foo-nodeport
+        port: 
+          number: 80
+- host: foo.example.com 
+http: 
+  paths: 
+  - path: /
+    pathType: ImplementationSpecific
+    backend: 
+      service: 
+        name: foo-nodeport
+        port: 
+          number: 80
+```
 
+#### Ingress HTTPS 传输
 
+目前，我们支持 Ingress 转发 http 请求，却不支持 https 的请求。因此还需要配置一下 TLS，以支持 https 请求。 
 
+客户端请求，与 IngressController 之间是通过 https 协议通信的。而 IngressController 与 Pod 之间的通信则是 http 的。如果运行在 Pod 上的应用程序不需要支持 TLS，或只能接收 http 通信。因此需要 IngressController 负责处理与 TLS 相关的所有内容。
 
+**注意：** Ingress 目前仅支持 L7 层 (7 层网络协议) 的负载均衡。未来计划支持 L4 层（4 层网络协议）负载均衡。
 
+- 创建私钥和私钥
+
+```
+openssl genrsa -out tls.key 2048
+
+openssl req -new -x509 -key tls.key -out tls.cert -days 360 -subj "/CN=kubia.example.com"
+```
+
+- 根据文件创建 Secret 
+
+```
+kubectl create secret tls tls-secret --cert=tls.cert --key=tls.key
+```
+
+- 创建 ingress-tls 
+
+```
+vim kubia-ingress-tls.yaml
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress  
+metadata:
+  name: kubia 
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+spec: 
+  tls: 
+  - hosts: 
+    - kubia.example.com 
+    secretName: tls-secret 
+  rules: 
+  - host: kubia.example.com 
+    http: 
+      paths: 
+      - pathType: ImplementationSpecific
+        path: /
+        backend: 
+          service: 
+            name: kubia-nodeport
+            port: 
+              number: 80
+```
+
+- 验证是否连通
+
+```
+curl -k -v  https://kubia.example.com 
+```
 
 
 
