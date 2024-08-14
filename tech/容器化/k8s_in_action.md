@@ -1777,26 +1777,254 @@ spec:
 curl -k -v  https://kubia.example.com 
 ```
 
+## 就绪探针 ReadinessProbe 
+
+之前我们了解到 LivenessProbe 存活探针，用来探测 Pod 是否健康，探测失败则重启 Pod。ReadinessProbe 是另外一种探测指针，就绪指针。
+
+<font color="#e36c09"><u>当就绪指针返回探测成功时，表示容器已经准备好接收请求。</u></font>就绪指针有以下三种类型：
+
+- **Exec 探针**：在容器内执行指令，根据退出状态码来确定；
+- **HTTP GET 探针**：向容器发送 HTTP GET 请求，通过 HTTP 请求响应状态码来确定；
+- **TCP socket 探针**：打开一个 TCP 连接到容器指定的端口，通过连接是否建立来确定。
+
+ReadinessProbe 可配置等待时间，经过等待时间之后，才执行第一次就绪检查，之后周期性调用探针。如果就绪探针报告失败，则会从 service 中剔除该 Pod。如果 Pod 再次准备就绪，则重新添加 Pod。<font color="#e36c09">ReadinessProbe，就是通过 Pod 摘除或添加到 service 的方式，来确保请求流量到已经准备就绪的 Pod。</font>
+
+>ReadinessProbe 和 LivenessProbe 
+
+ReadinessProbe 检测未通过时，不会像 LivenessProbe 那样，马上终止或重启 Pod。LivenessProbe 是通过杀死旧 Pod，重新启动新 Pod 形式来保证 Pod 的正常工作。
+
+ReadinessProbe 用来确保 Pod 准备好了之后，才可以接收处理请求。
+
+![[ReadinessProbe探测Pod.png]]
+
+### 添加 ReadinessProbe 
+
+> 方式 1，kubectl edit 
+
+- 通过修改 ReplicaSet 
+
+```
+kubectl edit rs kubia 
+```
+
+- 修改属性 `spec.template.spec.containers`
 
 
+> 方式 2，修改 yaml 
+
+- 创建 Pod 的 ReadinessProbe
+
+每个 Pod 都会有一个 ReadinessProbe 探针。此时探测的是目录 `/var/ready` 是否存在，目前是不存在的，所以是探测失败。
+
+```
+vim kubia-rs-readinessprobe.yaml
 
 
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: kubia
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubia
+  template:
+    metadata:
+      labels:
+        app: kubia
+    spec:
+      containers:
+      - image: 10.0.88.85:5000/kubia:v1.0
+        name: kubia
+        readinessProbe: 
+          exec: 
+            command: 
+            - ls 
+            - /var/ready
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+```
 
+- 默认 ReadinessProbe 的探测参数 
 
+每 10 秒检查一次。
 
+```
+Readiness: exec [ls /var/ready] delay=0s timeout=1s period=10s #success=1 #failure=3
+```
 
+- 给 Pod 创建文件夹 
 
+如果修改 yaml 文件，不会对已有 Pod 有影响，对新建的 Pod 才会影响。故还是需要对现有的 Pod 进行编辑操作。
 
+```
+kubectl get pod  | grep kubia
 
+NAME                      READY   STATUS    RESTARTS   AGE
+kubia-6jzln               0/1     Running   0          7s
+kubia-r2s4h               0/1     Running   0          7s
+kubia-ssgdv               0/1     Running   0          7s
 
+kubectl exec kubia-6jzln -- touch /var/ready
+kubectl exec kubia-r2s4h -- touch /var/ready
+kubectl exec kubia-ssgdv -- touch /var/ready
+```
 
+### ReadinessProbe 使用
 
+>规范使用 ReadinessProbe 
 
+既然 ReadinessProbe 可以控制 Pod 在 service 上的添加、删除来控制请求访问 Pod。那么实际应用中是通过调整 ReadinessProbe 返回成功或失败么？
 
+**强制：** 如果要控制 service 上 Pod 的添加、删除，正确的操作是：**删除 Pod 或更改 Pod 标签⽽不是⼿动更改 ReadinessProbe 来从服务中⼿动移除 Pod。** 我们可以定义标签 `enabled=true` 来控制 service 关联的 Pod。 
 
+> 务必定义就绪探针 
 
+没有定义 ReadinessProbe，那么 Pod 启动后就开始接收转发的请求，此时 Pod 并未准备好，会出现大量连接失败的现象。
 
+> 不要将停止 Pod 的逻辑纳入 ReadinessProbe 中
 
+当 Pod 关闭时，应用程序收到终止信号后会立即停止接收连接，Kubernetes 会自动从所有的 service 中移除该 Pod。 
+
+所以无需多此一举，使用 ReadinessProbe。
+
+## Headless  service 
+
+我们可以通过发现 service，并由 service 将请求转发到其中一个 Pod 上。如果我们需要发现所有的 Pod IP，显然现有的 service 无法达到这个目的。
+
+要想找到所有 Pod IP，可以通过以下方式：
+
+- Kubernetes API 服务器，应用程序不应该与 Kubernetes 强绑定，不推荐此方式；
+- DNS 查找发现 Pod IP，（在 spec 中指定 clusterIP 字段设置为 None），DNS 服务器将返回 Pod IP，而不是单个 service IP；  
+
+将 service 中的 `spec.clusterIP` 设置为 None，该 service 将成为 headless service。此时 Kubernetes 不会为其分配集群 IP，客户端可通过该 IP 将其连接到支持它的 Pod。 
+
+### 创建 headless service 
+
+```
+vim kubia-svc-headless.yaml 
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia-headless  
+spec:
+  clusterIP: None 
+  ports: 
+  - port: 80 
+    targetPort: 8080
+  selector:
+    app: kubia
+```
+
+### DNS 发现 Pod 
+
+新建一个 Pod 用来执行 DNS 查找。
+
+- 新建 Pod 
+
+```
+kubectl run dnsutils --image=tutum/dnsutils  --command -- sleep infinity
+```
+
+`--generator=run-pod/v1`：让 kubectl 之间创建 Pod，而不是通过 rc、rs 等资源来创建。
+
+- 执行 dns 查找 
+
+```
+kubectl exec dnsutils -- nslookup  kubia-headless.default.svc.cluster.local
+
+kubectl exec dnsutils -- nslookup  kubia.default.svc.cluster.local
+```
+
+从以上执行的指令可以看出，kubia-headless 返回的是多个 Pod IP，而 kubia 常规 service 返回的是 service IP。
+
+注意 headless 服务仍然提供跨 pod 的负载平衡，但是通过 DNS 轮询机制不是通过服务代理。
+
+**发现所有的 Pod，包括未就绪的 Pod**
+
+- 移除就绪探针探测的目录
+
+```
+kubectl exec kubia-ssgdv -- rm -rf /var/ready
+```
+
+- 查看 dns 
+
+发现只有 ready 的 Pod IP。
+
+```
+kubectl exec dnsutils -- nslookup  kubia-headless.default.svc.cluster.local
+```
+
+- 如果需要发现全部的 Pod IP 
+
+编辑 headless service yaml 文件，增加属性 `spec.publishNotReadyAddresses`。
+
+```
+vim kubia-svc-headless-all.yaml 
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia-headless-all  
+spec:
+  publishNotReadyAddresses: true
+  clusterIP: None 
+  ports: 
+  - port: 80 
+    targetPort: 8080
+  selector:
+    app: kubia
+```
+
+- 查看 dns 
+
+此时，可以发现未 ready 的 Pod IP。
+
+```
+kubectl exec dnsutils -- nslookup  kubia-headless-all.default.svc.cluster.local
+```
+
+## Service 故障排查 
+
+当无法通过 service IP 或 FQDN 连接到 Pod 时，该如何排查。
+
+1. service ip 只能从集群内部连接，集群外部无法访问 service ip。如果 service 时 NodePod 类型，连接的应该是 Node IP，而不是使用 service ip； 
+
+2. 不应该通过 ping service ip 来确定服务是否可以访问；
+
+3. 定义 ReadinessProbe，检查是否成功，否则 Pod 会从 service 中摘除；
+
+4. 检查 Pod 是否关联上 service，使用命令 `kubectl get endpoints`；
+
+5. 如果 FQDN 连接不通，检查使用 clusterIP 是否可以连通；
+
+6. 检查客户端连接端口，连接的应该时 service 暴露的端口，而不是 service 连接的目标
+
+7. 如果直接连接到 Pod，需要知道 Pod 暴露的正确端口；
+
+8. ⽆法通过 pod 的 IP 访问应⽤，请确保应⽤不是仅绑定到本地主机。
+
+第 8 条参看 ChatGPT 回答：
+
+```
+这段话的意思是,即使您可以通过 Pod 的 IP 地址访问到 Pod,但是如果应用程序只绑定到了本地主机(即 127.0.0.1)而不是绑定到所有网络接口(0.0.0.0)的话,那么您仍然无法从外部访问到该应用程序。
+
+这种情况通常发生在以下几种情况:
+
+1. 应用程序代码中,监听的网络接口被硬编码为 127.0.0.1 而不是 0.0.0.0。
+2. 应用程序使用了一些框架或库,默认情况下会将监听接口设置为 127.0.0.1。
+3. 应用程序的配置文件中,监听接口被设置为 127.0.0.1。
+
+如果应用程序只绑定到本地主机,那么即使您可以通过 Pod 的 IP 地址访问到 Pod,但是从 Pod 外部是无法访问到该应用程序的。
+
+要解决这个问题,您需要确保应用程序绑定到所有网络接口(0.0.0.0)或者特定的网络接口(如 Pod 的 IP 地址)。这样就可以确保应用程序可以从 Pod 外部访问到。
+
+您可以通过检查应用程序的代码、配置文件或使用的框架/库,来确定应用程序绑定的网络接口,并进行相应的修改。
+```
 
 
 
