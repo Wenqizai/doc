@@ -2026,17 +2026,69 @@ kubectl exec dnsutils -- nslookup  kubia-headless-all.default.svc.cluster.local
 您可以通过检查应用程序的代码、配置文件或使用的框架/库,来确定应用程序绑定的网络接口,并进行相应的修改。
 ```
 
+# Volume 卷
 
+卷是 Pod 的一个组成部分，像容器一样在 Pod 的规范中就定义了。卷不是独立的 Kubernetes 对象，不能单独创建或删除。 
 
+卷需要加载到容器中使用，可以挂载到文件系统的任意位置。
 
+## 简介
 
+### 卷的应用
 
+**无挂载卷**
 
+如图，Pod 启动 3 个容器，每个容器读写文件系统的目录。因为容器内的文件系统是独立的，所以这三个容器之间的读写文件也是独立。比如 WebServer 无法读取 ContentAgent 产生的 html 文件，LogRotator 也是无法读取 Webserver 产生的 log 文件。
 
+无挂载卷，文件不共享，容器之间的分工划分也没有意义，因为读取的文件是空的，无工可做。
 
+⚠️upload failed, check dev console
+![[无挂载卷示例.png|450]]
 
+**挂载卷**
 
+如图，Pod 启动三个容器的目录分别挂载到 publicHtml 和 logVol 卷中。文件之间可以通过卷来访问，实现文件的共享。
 
+此时，这两个卷最初是空的，名为 <font color="#c0504d">emptyDir</font>。Kubernetes 还支持其他类型的卷，不同卷类型有不同的生命周期。卷的填充和装入过程是在 Pod 内启动容器时执行。卷被绑定到 Pod 的 lifecycle（⽣命周期）中，只有在 Pod 存在时才会存在。但取决于卷的类型，即使在 pod 和卷消失之后，卷的⽂件也可能保持原样，并可以挂载到新的卷中。
+
+⚠️upload failed, check dev console
+![[image-20240818145733448.png|400]]
+
+### 卷类型
+
+**EmptyDir** 
+
+用来存储<font color="#c0504d">临时数据</font>的简单空目录。
+
+**HostPath** 
+
+用来将 Work Node 的文件系统中的目录挂载到 Pod 中。
+
+**GitRepo** 
+
+通过检查 Git 仓库的内容来初始化卷。
+
+**NFS** 
+
+挂载到 Pod 中的 NFS 共享卷。
+
+**云厂商提供特定存储类型**
+
+- gcePersistentDisk ：Google ⾼效能型存储磁盘卷 
+- awsElastic BlockStore：AmazonWeb 服务弹性块存储卷
+- azureDisk：Microsoft Azure 磁盘卷
+
+**网络存储类型**
+
+Cinder 、 cephfs 、 iscsi 、 flocker 、 glusterfs 、 quobyte 、 rbd 、FlexVolume、vsphere-Volume、photonPersistentDisk、scaleIO ⽤于挂载其他类型的⽹络存储。
+
+**Kubernetes 特殊类型**
+
+ConfigMap、secret、downwardAPI：⽤于将 Kubernetes 部分资源和集群信息公开给 pod 的特殊类型的卷。
+
+**persistentVolumeClaim**
+
+⼀种使⽤预置或者动态配置的持久存储类型。
 
 
 
