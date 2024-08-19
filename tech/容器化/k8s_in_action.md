@@ -2080,7 +2080,7 @@ kubectl exec dnsutils -- nslookup  kubia-headless-all.default.svc.cluster.local
 
 **网络存储类型**
 
-Cinder 、 cephfs 、 iscsi 、 flocker 、 glusterfs 、 quobyte 、 rbd 、FlexVolume、vsphere-Volume、photonPersistentDisk、scaleIO ⽤于挂载其他类型的⽹络存储。
+cinder 、 cephfs 、 iscsi 、 flocker 、 glusterfs 、 quobyte 、 rbd 、FlexVolume、vsphere-Volume、photonPersistentDisk、scaleIO ⽤于挂载其他类型的⽹络存储。
 
 **Kubernetes 特殊类型**
 
@@ -2242,4 +2242,58 @@ kubectl port-forward --address 10.0.88.85 gitrepo-volume-pod 8080:80
 GitRepo 存储卷，就像 emptyDir 卷⼀样，基本上是⼀个专⽤⽬录，专门⽤于包含卷的容器并单独使⽤。当 Pod 被删除时，卷及其内容被删除。然⽽，其他类型的卷并不创建新⽬录，⽽是将现有的外部⽬录挂载到 Pod 的容器⽂件系统中。
 
 GitRepo 已经在 `v1.11` 版本废弃，无须过多纠结。
+
+## HostPath 
+
+大多数 Pod 都应该访问节点系统上的任何文件，但是一些系统级的 Pod，（如 DaemonSet 管理的），确实需要读取 Node 上系统文件。HostPath 卷就是用来解决访问节点上文件的卷。
+
+HostPath 卷指向 Node 文件系统特定的文件或目录，同一 Node 上的 Pod 如果使用相同的 HostPath，则可以看到相同的文件。
+
+![[HostPath卷.png|425]]
+
+HostPath 卷，是一个持久卷，不会像 EmptyDir 和 GitRepo 一样在容器删除时而被清除。重新启动 Pod 可以沿用之前 Pod 的数据。但需要注意，这个数据只是节点上的数据，但 Pod 被调度到其他节点，这部分数据也是无法访问的。
+
+比如数据库就不适合使用 HostPath。
+
+## NFS
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
