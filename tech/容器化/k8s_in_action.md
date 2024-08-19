@@ -2052,7 +2052,7 @@ kubectl exec dnsutils -- nslookup  kubia-headless-all.default.svc.cluster.local
 此时，这两个卷最初是空的，名为 <font color="#c0504d">emptyDir</font>。Kubernetes 还支持其他类型的卷，不同卷类型有不同的生命周期。卷的填充和装入过程是在 Pod 内启动容器时执行。卷被绑定到 Pod 的 lifecycle（⽣命周期）中，只有在 Pod 存在时才会存在。但取决于卷的类型，即使在 pod 和卷消失之后，卷的⽂件也可能保持原样，并可以挂载到新的卷中。
 
 ⚠️upload failed, check dev console
-![[image-20240818145733448.png|400]]
+![[挂载共享卷示例.png|400]]
 
 ### 卷类型
 
@@ -2175,6 +2175,71 @@ Kubernetes 在 tmfs⽂件系统（<font color="#e36c09">存在内存⽽⾮硬盘
 	    medium: Memory 
 ```
 
+## GitRepo 
+
+GitRepo 卷基本上也是一个 emptyDir 卷。在 Pod 启动时，克隆 Git 仓库中特定版本来填充数据。
+
+![[GitRepo流程图.png]]
+
+>**注意：** 在创建 GitRepo 卷后，<font color="#e36c09">它并不能和对应 repo 保持同步</font>。当向 Git 仓库推送新增的提交时，卷中的⽂件将不会被更新。只有在新建 Pod 时，Pod 中才会包含最新的提交的卷。
 
 
+ 同时 `gitRepo` 卷在 Kubernetes v1.11 中被弃用，建议使用 Init Containers 或 CI/CD 工具等替代方案来处理从 Git 仓库获取代码的需求。这将提高安全性和灵活性。
+
+
+**创建 GitRepo 卷**
+
+创建 pod 时，⾸先将卷初始化为⼀个空⽬录，然后将制定的 Git 仓库克隆到其中。如果没有将⽬录设置为 `.`（句点），存储库将会被克隆到 kubia-website-example⽰例⽬录中，而我们的卷更希望放在根目录中。
+
+
+```
+vim gitrepo-volume-pod.yaml
+
+
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: gitrepo-volume-pod 
+spec:
+  containers:
+  - image: 10.0.88.85:5000/nginx:1.18
+    name: web-server 
+    volumeMounts: 
+    - name: html 
+      mountPath: /usr/share/nginx/html 
+      readOnly: true 
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes: 
+  - name: html 
+    gitRepo: 
+      repository: https://github.com/luksa/kubia-website-example.git
+      revision: master 
+      directory: .   # 将 repo 克隆到卷的根目录 
+```
+
+**测试**
+
+```
+# 使用端口转发形式 
+kubectl port-forward gitrepo-volume-pod 8080:80
+kubectl port-forward --address 10.0.88.85 gitrepo-volume-pod 8080:80
+
+# 使用 service 或 集群内访问集群 ip 
+```
+
+
+**那么每次提交 Git，都要删除 Pod，重新创建 Pod？**
+
+为了避免这种问题，我们可以通过以下方式来实现 git 的同步：
+
+1. Pod 容器内实现 git pull (显然不合理，比如以上的 nginx 容器还要实现 git 的逻辑，职责不单一)
+2. `sidecar` 容器
+
+**总结** 
+
+GitRepo 存储卷，就像 emptyDir 卷⼀样，基本上是⼀个专⽤⽬录，专门⽤于包含卷的容器并单独使⽤。当 Pod 被删除时，卷及其内容被删除。然⽽，其他类型的卷并不创建新⽬录，⽽是将现有的外部⽬录挂载到 Pod 的容器⽂件系统中。
+
+GitRepo 已经在 `v1.11` 版本废弃，无须过多纠结。
 
