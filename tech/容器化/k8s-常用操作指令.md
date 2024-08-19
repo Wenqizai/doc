@@ -79,6 +79,11 @@ kubectl get svc <serviceName>
 
 # 如果不想通过 Pod 来暴露端口通信，亦可通过简单的端口转发来通信（仅用在调试）
 kubectl port-forward <podName> 本机端口:Pod 端口
+
+# 绑定不同 IP 地址， 不指定默认 127.0.0.1 的流量才能转发
+kubectl port-forward --address <本机IP> <podName> 本机端口:Pod 端口
+kubectl port-forward --address 0.0.0.0 <podName> 本机端口:Pod 端口
+
 # 删除端口转发，ctrl + c 或者一下
 ps aux | grep port-forward
 

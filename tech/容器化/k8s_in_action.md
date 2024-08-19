@@ -2090,17 +2090,90 @@ ConfigMap、secret、downwardAPI：⽤于将 Kubernetes 部分资源和集群信
 
 ⼀种使⽤预置或者动态配置的持久存储类型。
 
+## EmptyDir 
+
+**准备材料**
+
+```
+docker pull ubuntu:22.04
+docker tag ubuntu:22.04 10.0.88.85:5000/ubuntu:22.04
+docker push 10.0.88.85:5000/ubuntu:22.04
+docker rmi ubuntu:22.04
+```
+
+脚本：Dockerfile、fortuneloop.sh
+
+```
+docker build -t 10.0.88.85:5000/luksa/fortune:v1.0 .
+docker push 10.0.88.85:5000/luksa/fortune:v1.0
+```
+
+**挂在 EmptyDir 的 Pod**
+
+容器 fortune，将目录 `/var/htdocs` 挂在到卷 html 中；
+容器 web-server，将目录 `/usr/share/nginx/html` 挂在到卷 html 中；
+卷 html，类型为 emptyDir。
+
+```
+vim fortune-pod-emptydir.yaml
 
 
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: fortune 
+spec:
+  containers:
+  - image: 10.0.88.85:5000/luksa/fortune:v1.0
+    name: html-generator
+    volumeMounts: 
+    - name: html 
+      mountPath: /var/htdocs
+  - image: 10.0.88.85:5000/nginx:1.18
+    name: web-server 
+    volumeMounts: 
+    - name: html 
+      mountPath: /usr/share/nginx/html 
+      readOnly: true 
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes: 
+  - name: html 
+    emptyDir: {}
+```
 
+**测试**
 
+- 访问方式 
 
+```
+# 使用端口转发形式 
+kubectl port-forward fortune 8080:80
+kubectl port-forward --address 10.0.88.85 fortune 8080:80
 
+# 使用 service 或 集群内访问集群 ip 
+```
 
+- 测试
 
+```
+curl http://10.0.88.85:8080 
+curl http://127.0.0.1:8080
+```
 
+**存储介质**
 
+EmptyDir，作为卷，创建在 Pod 工作节点的实际磁盘上，其性能取决于节点的磁盘类型。如果我们想要获取性能上的提升，我们可以指定 emptyDir 的存储介质。
 
+Kubernetes 在 tmfs⽂件系统（<font color="#e36c09">存在内存⽽⾮硬盘</font>）上创建 emptyDir。因此，将 emptyDir 的 medium 设置为 Memory
+
+```
+	volumes: 
+	- name: html 
+	  emptyDir：
+	    medium: Memory 
+```
 
 
 
