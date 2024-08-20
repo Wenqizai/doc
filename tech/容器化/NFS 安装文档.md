@@ -46,7 +46,7 @@ systemctl reload rpcbind
 mkdir /public 
 
 vim /etc/exports 
- 	/public 10.0.88.0/24(rw,sync,no_subtree_check)
+ 	/public 10.0.88.0/24(rw,sync,no_subtree_check,no_root_squash)
 
 systemctl reload nfs
 ```
@@ -83,7 +83,7 @@ yum install -y nfs-utils
 - 挂载目录 
 
 ```
-mount -t nfs /mnt/nfs/public 10.0.88.85:/public/ 
+mount -t nfs 10.0.88.85:/public/ /mnt/nfs/public 
 umount /mnt/nfs/public
 ```
 

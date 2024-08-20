@@ -2257,8 +2257,86 @@ HostPath 卷，是一个持久卷，不会像 EmptyDir 和 GitRepo 一样在容�
 
 ## NFS
 
+HostPath 卷挂载到主机节点上，当 Pod 被调度到其他节点时，原来 Pod 的数据就无法再访问。为了解决这种场景，我们需要将卷挂载到外部持久化存储，不同节点访问这一份存储，避免被调度后无法访问旧数据的问题。
 
+关于外部存储，不同的服务器厂商有不同的解决方案：
 
+- Google Kubernetes：GCE persistent disk 
+- AWS EC2：awsElasticBlockStore 
+- Microsoft Azure：azureFile / azureDisk 
+- 自建服务器：NFS 
+
+**挂载卷**
+
+- 持久卷挂载示意图 
+
+下图使用的外部存储是 GCE，在本例使用的 NFS，架构不变。
+
+![[持久卷挂载示意图.png]]
+
+- 准备目录
+
+```
+# server 10.0.88.85 
+mkdir -p /public/mongodb/
+```
+
+- 准备 Pod mongdb
+
+```
+vim nfs-mongodb-volume-pod.yaml
+
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: mongodb  
+spec:
+  containers:
+  - image: 10.0.88.85:5000/mongo:4.0.28
+    name: mongodb  
+    securityContext:
+      runAsUser: 0
+    volumeMounts: 
+    - name: mongodb-data 
+      mountPath: /data/db
+    ports:
+    - containerPort: 27017
+      protocol: TCP
+  volumes: 
+  - name: mongodb-data  
+    nfs: 
+      server: 10.0.88.85 
+      path: /public/mongodb/
+```
+
+遇到一下报错，需要配置 nfs 的目录权限为 `no_root_squash`（官方不太推荐这种方式，这里只是 demo 演示）：
+
+```
+chown: changing ownership of '/data/db': Operation not permitted
+```
+
+- 测试数据 
+
+```
+kubectl exec -it mongodb -- mongo
+
+use mystore 
+
+db.foo.insert({name:'foo'})
+
+db.foo.find()
+```
+
+- 测试 
+
+```
+kubectl get po -o wide
+kubectl delete po mongodb 
+kubectl apply -f nfs-mongodb-volume-pod.yaml
+
+kubectl exec -it mongodb -- mongo
+db.foo.find()
+```
 
 
 
