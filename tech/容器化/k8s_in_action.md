@@ -2362,6 +2362,190 @@ db.foo.find()
 
 ![[PV&PVC关系.png]]
 
+### PV 
+
+PV 属于集群资源，不属于任何命名空间。
+
+![[集群资源pv.png]]
+
+**创建 PV**
+
+PersistentVolumeReclaimPolicy，卷被删除后的处理措施：
+
+- <font color="#e36c09">Deleted</font>：删除卷时删除数据；
+- <font color="#e36c09">Retain</font>：默认值，删除卷时保留数据，不清理和删除；
+- <font color="#e36c09">Recycle</font>：回收，删除卷时清空卷数据，方便被重新分配。
+
+AccessModes，PV 的访问模式：
+
+- <font color="#e36c09">ReadWriteOnce (RWO)</font>：该卷可以被单个节点以读写模式挂载。
+- <font color="#e36c09">ReadOnlyMany (ROX)</font>：该卷可以被多个节点以只读模式挂载。
+- <font color="#e36c09">ReadWriteMany (RWX)</font>：该卷可以被多个节点以读写模式挂载。
+
+```
+vim mongodb-pv-nfs.yaml 
+
+apiVersion: v1
+kind: PersistentVolume  
+metadata:
+  name: mongodb-pv  
+spec:
+  capacity:
+    storage: 1Gi 
+  accessModes: 
+  - ReadWriteOnce 
+  - ReadOnlyMany 
+  persistentVolumeReclaimPolicy: Retain 
+  nfs: 
+    server: 10.0.88.85 
+    path: /public/mongodb/
+```
+
+### PVC 
+
+我们已经创建了 PV，接下来需要创建一个 PVC 在 Pod 内使用。但要注意声明一个持久卷和创建一个 Pod 是相对独立的过程。如果 Pod 发生了调度，也是希望通过相同的 PVC 来确保可用的。
+
+**创建 PVC**
+
+PVC 申请 1 GiB 的存储空间，允许单个客户端的读写。
+
+```
+vim mongodb-pvc.yaml 
+
+
+apiVersion: v1
+kind: PersistentVolumeClaim   
+metadata:
+  name: mongodb-pvc   
+spec:
+  resources: 
+    requests: 
+      storage: 1Gi
+  accessModes: 
+  - ReadWriteOnce 
+  storageClassName: ""
+```
+
+当创建好了 PVC 之后，发现 `mongodb-pvc` 自动已经绑定上了 `mongodb-pv`。创建了 PVC 时，Kubernetes 会根据一些匹配模式来找到对应的 PV，并进行绑定。
+
+- PV 的容量大于等于 PVC 的容量；
+- PV 的访问模式包含 PVC 指定的访问模式。 
+
+**注意：**
+
+当 pvc 绑定 pv 之后，查看 pv `kubectl get pv`，可以发现 pvc 绑定在命名空间 default 内。
+当 pvc 绑定 pv 之后，此时的 pv 和 pvc 只能给相同命名空间的 Pod 使用。
+
+```
+# 查看 pvc 已经绑定了 pv 
+kubectl get pvc 
+```
+
+**创建 PVC 的 Pod**
+
+```
+vim mongodb-pod-pvc.yaml 
+
+apiVersion: v1
+kind: Pod 
+metadata:
+  name: mongodb  
+spec:
+  containers:
+  - image: 10.0.88.85:5000/mongo:4.0.28
+    name: mongodb  
+    volumeMounts: 
+    - name: mongodb-data 
+      mountPath: /data/db
+    ports:
+    - containerPort: 27017
+      protocol: TCP
+  volumes: 
+  - name: mongodb-data  
+    persistentVolumeClaim: 
+      claimName: mongodb-pvc
+```
+
+### 回收 PV&PVC
+
+- 删除 Pod & pvc  
+
+```
+kubectl delete pod mongodb 
+kubectl delete pvc mongodb-pvc 
+```
+
+- 再次创建 pvc 
+
+查看 pvc 发现，状态是 `Pending`，没有自动绑定 pv。
+
+```
+kubectl apply -f mongodb-pvc.yaml
+kubectl get pvc 
+```
+
+- 查看 pv 
+
+发现 pv 还是绑定 `default/mongodb-pvc` ，状态是 `Released`，而不是 `Available`。
+
+```
+kubectl get pv 
+```
+
+因为这个 pv 已经被之前的 pvc 使用过了，包含前一个 pvc 的数据。如果这些数据不被清理，则这个 pv 不会被绑定到新的 pvc 中。
+
+值得注意是，Pod 使用相同的 PV 时，即使 Pod 和 PVC 在不同的命名空间也是可以使用之前 Pod 的数据的。
+
+**手动回收**
+
+手动删除 pvc 和 pv，然后重新创建。对于 pv 绑定的外部存储也是手动选择清理还是保留。
+
+```
+kubectl delete pvc mongodb-pvc
+kubectl delete pv mongodb-pv 
+
+kubectl apply -f mongodb-pv.yaml 
+kubectl apply -f mongodb-pvc.yaml 
+
+kubectl get pv 
+kubectl get pvc 
+```
+
+**自动回收**
+
+设置 PV 的回收策略，PersistentVolumeReclaimPolicy：
+- <font color="#e36c09">Deleted</font>：删除卷时删除数据；
+- <font color="#e36c09">Retain</font>：默认值，删除卷时保留数据，不清理和删除；
+- <font color="#e36c09">Recycle</font>：回收，删除卷时清空卷数据，方便被重新分配。
+
+![[PV自动回收.png]]
+
+当删除 pvc 时，后台会启动一个 Pod `recycler-for-mongodb-pv`，对 pv 进行回收处理，回收之后的 pv 的状态是 `Available`，可以被新的 pvc 再次绑定。
+
+**注意：** Recycle 模式虽然可以回收 PV，但是底层的数据也是一同被删除了，不会像 Retain 会保留底层数据。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -244,3 +244,13 @@ kubectl exec <podName> -- <command>
 kubectl exec <podName> -- env
 
 ```
+
+## PV&PVC
+
+```
+kubectl get pv 
+kubectl get pvc 
+
+kubectl delete pv <pvName>
+kubectl delete pvc <pvcName>
+```
