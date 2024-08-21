@@ -1,4 +1,28 @@
-  ## Node
+# 命令补全 
+
+- Tab 补全
+
+```
+yum install bash-completion
+source <(kubectl completion bash)
+echo "source <(kubectl completion bash)" >> ~/.bashrc
+source ~/.bashrc
+```
+  
+- 历史命令搜索
+
+方向上下键切换
+
+```
+cat >> ~/.bashrc << 'EOF'
+if [[ $- == *i* ]]; then
+bind '"\e[A": history-search-backward'
+bind '"\e[B": history-search-forward'
+fi
+EOF
+source ~/.bashrc
+```
+# Node
 
 ```
 # 查看工作节点
@@ -9,7 +33,7 @@ kubectl describe node <nodeName>
 
 ```
 
-## Pod 
+# Pod 
 
 ```
 # 启动 pod 运行 ReplicationController 服务
@@ -39,7 +63,7 @@ kubectl create -f <yaml>
 ```
 
 
-## Deployment 
+# Deployment 
 
 ```
 # 查看 deploy
@@ -53,10 +77,11 @@ kubectl delete deployment <deployment-name> -n <namespace>
 # 伸缩 deploy 
 kubectl scale deploy <deployment-name> --replicas=1
 
+kubectl get deploy <deployment-name> -o yaml > custom.yaml
 
 ```
 
-## Yaml
+# Yaml
 
 ```
 kubectl apply -f <yaml>
@@ -69,7 +94,7 @@ get deploy <deployName> -o yaml > temp.yml
 kubectl get po <podName> -o yaml > temp.yaml
 ```
 
-## Service
+# Service
 
 ```
 # 查看服务
@@ -92,7 +117,7 @@ kubectl get ing
 
 ```
 
-## Label
+# Label
 
 ```
 # 查看标签
@@ -124,7 +149,7 @@ kubectl label node <node_name> <label_key>=<label_value>
 
 ```
 
-## Namespace 
+# Namespace 
 
 ```
 kubectl get ns
@@ -140,7 +165,7 @@ kubectl apply -f kubia-manual.yaml -n custom-namespace
 kubectl delete ns <namespaceName>
 ```
 
-## Log 
+# Log 
 
 
 ```
@@ -151,13 +176,47 @@ kubectl logs <podName> -c <containerName> -n <namespace>
 
 # 查看上一个 pod 的日志（通常发生 pod 重启之后）
 kubectl logs <podName> --previous
+
+# 滚动查看 Pod 10行日志
+kubectl logs -f --tail=10 <podName> -n <namespace>
+
+# 查看 deploy 某一个 Pod 的日志 
+kubectl logs -f --tail=10 deploy/<podName> -n <namespace>
+
+# 根据 label 汇总 Pod 日志 
+kubectl logs -f --tail=10 -l <labelKey>=<labelValue> -n <namespace> 
 ```
 
-## DaemonSet
+## Kubetail 日志工具
+
+- 安装
+
+```
+cd /root 
+
+wget https://raw.githubusercontent.com/johanhaleby/kubetail/master/kubetail --no-check-certificate
+
+chmod +x kubetail
+mv kubetail /usr/bin/
+```
+
+- 使用 
+
+```
+# 指定容器日志查询
+kubetail <podName> -c <containerName> -n <namespace>
+
+# label 查询
+kubetail -l <labelKey>=<labelValue> -n <namespace> 
+
+# 查询 deploy 所有 pod 日志, 取 10 分钟内最后 10 条
+kubetail <deployName> -n <namespace> --since 10m --tail 10
+```
+# DaemonSet
 
 指令可参考 rc、rs。
 
-## ReplicaSet 
+# ReplicaSet 
 
 ```
 # 查看 rs 
@@ -169,7 +228,7 @@ kubectl describe rs <name>
 
 ```
 
-## ReplicationController 
+# ReplicationController 
 
 ```
 # 查看 rc 信息
@@ -191,7 +250,7 @@ kubectl delete rc kubia --cascade=false
 kubectl delete rc kubia
 ```
 
-## Explain 
+# Explain 
 
 ```
 # 查看资源文档
@@ -210,7 +269,7 @@ kubectl explain pod.spec.containers
 kubectl explain --help
 ```
 
-## API 
+# API 
 
 ```
 # 查看 kubectl api 
@@ -221,7 +280,7 @@ kubectl api-resources | grep deployment
 kubectl api-resources | grep replicaSet
 ```
 
-## Job 
+# Job 
 
 ```
 # 查看 job 
@@ -234,7 +293,7 @@ kubectl delete job <jobName>
 kubectl edit job <jobName>
 ```
 
-## Bash
+# Bash
 
 ```
 # 执行 Pod 终端命令, -- 代表 kubectl 命令结束，之后输入终端命令
@@ -245,7 +304,7 @@ kubectl exec <podName> -- env
 
 ```
 
-## PV&PVC
+# PV&PVC
 
 ```
 kubectl get pv 
@@ -254,3 +313,132 @@ kubectl get pvc
 kubectl delete pv <pvName>
 kubectl delete pvc <pvcName>
 ```
+
+# 插件
+
+## Krew 
+
+Krew：插件管理工具。
+
+安装：[Installing · Krew](https://krew.sigs.k8s.io/docs/user-guide/setup/install/)
+插件列表：[Kubectl plugins available · Krew](https://krew.sigs.k8s.io/plugins/)
+
+- 使用 
+
+```
+kubectl krew version 
+kubectl krew update 
+kubectl krew search
+kubectl krew install/uninstall <pluginName>
+kubectl krew list 
+```
+
+- 永久写入用户的环境变量文件，避免登出后失效。
+
+```
+cat >> ~/.bashrc << 'EOF'
+export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+EOF
+source ~/.bashrc
+```
+## ns 
+
+方便切换 ns 和锁定 ns 
+
+```
+# 安装 
+kubectl krew install ns 
+
+# 列举当前 ns 和所有的 ns
+kubectl ns
+
+# 切换 ns
+kubectl ns <namespace>
+```
+
+## images 
+
+查看 Pod 使用的镜像，功能类似：`docker images`
+
+```
+kubectl krew install images 
+
+kubectl images  
+```
+
+## neat 
+
+输出更为简洁的配置文件
+
+```
+kubectl krew install neat 
+
+kubectl get deploy <deployName> -o yaml | kubectl neat  
+kubectl get deploy <deployName> -o json | kubectl neat  
+```
+
+## pv-migrate 
+
+PV 数据迁移工具，当底层存储变更时，可以用来迁移存储数据，指定的是 PVC。
+
+[GitHub - utkuozdemir/pv-migrate: CLI tool to easily migrate Kubernetes persistent volumes](https://github.com/utkuozdemir/pv-migrate)
+
+```
+kubectl krew install pv-migrate
+
+# 同 namespace 的 pv 迁移
+kubectl pv-migrate migrate <source-pvc> test-pvc
+
+# 不同 namespace 的 pv 迁移
+kubectl pv-migrate migrate --source-namespace source-ns --
+dest-namespace dest-ns <source-pvc> <dest-pvc>
+```
+
+## df-pv
+
+查看 pvc 的使用率 
+
+```
+kubectl krew install df-pv
+
+kubectl df-pv 
+```
+
+## score 
+
+分析 yaml 文件，并给出优化建议 
+
+```
+kubectl krew install score 
+kubectl score <yaml>
+```
+## lineage / tree 
+
+查看资源的关联项，仅向下查找
+
+```
+kubectl krew install lineage 
+
+kubectl lineage deploy <deployName>
+kubectl lineage pod <podName>
+kubectl lineage <resource> <resourceName> 
+```
+
+## resource-capacity
+
+```
+kubectl krew install resource-capacity
+
+# 查看 node 资源，限制与实际使用量
+kubectl resource_capacity -u -p
+kubectl resource_capacity -u -p -n <namespace>
+```
+
+
+
+
+
+
+
+
+
