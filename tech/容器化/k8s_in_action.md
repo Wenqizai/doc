@@ -2526,6 +2526,8 @@ kubectl get pvc
 
 ## 动态卷 
 
+### 指定 StorageClass
+
 创建 PV，创建 PVC，创建 Pod，这是我们常规的操作。在创建 PV 期间，我们常常会面临一系列的问题：  
 - 需要分配多大空间的 PV？
 - 需要创建多少个 PV 来提供给 PVC 绑定？
@@ -2534,6 +2536,126 @@ kubectl get pvc
 针对以上面临的问题，我们可以通过配置动态卷来解决，开发人员仅通过配置 PVC，由 Kubernetes 动态分配和管理 PV。 
 
 集群管理员通过创建一个持久卷配置，定义一个或多个 StorageClass 对象，让用户选择持久卷类型，并在创建 PVC 中引用 StorageClass。StorageClass 与 PV 类似，并⾮属于某一个**命名空间**。
+
+**创建 StorageClass**
+
+```
+vim storageclass-fast-nfs.yaml 
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast 
+provisioner: mynfs
+```
+
+**创建 PVC**
+
+指定存储类 storageClassName，如果存储类不存在时，PV 将会创建失败，PVC 的状态一直在 `Pending` 。
+
+```
+vim kubia-pvc-dp.yaml 
+
+apiVersion: v1
+kind: PersistentVolumeClaim   
+metadata:
+  name: kubia-dp-pvc   
+spec:
+  resources: 
+    requests: 
+      storage: 100Mi
+  accessModes: 
+  - ReadWriteOnce 
+  storageClassName: fast 
+```
+
+动态创建的 PV 回收策略是 Deleted，当 PVC 被删除是，PV 也会一同被删除。
+
+**创建 Pod
+
+```
+vim kubia-pvc-dp-pod.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kubia-pvc-dp-pod 
+spec:
+  containers:
+  - image: 10.0.88.85:5000/kubia:v1.0
+    name: kubia
+    ports:
+    - containerPort: 8080
+      protocol: TCP
+  volumes: 
+  - name: kubia-data  
+	persistentVolumeClaim: 
+	  claimName: kubia-dp-pvc
+```
+
+### 不指定 StorageClass 
+
+如果 PVC 没有明确指出要使用哪个 StorageClass，PVC 将会绑定 default StorageClass。 
+
+**创建 default StorageClass**
+
+```
+vim storageclass-default.yaml 
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: default 
+  annotations: 
+    storageclass.kubernetes.io/is-default-class: "true" 
+provisioner: mynfs
+```
+
+**创建没有指定 StorageClass 的 PVC**
+
+```
+vim mongodb-pvc-dp-nostorageclass.yaml 
+
+apiVersion: v1
+kind: PersistentVolumeClaim   
+metadata:
+  name: mongodb-pvc2   
+spec:
+  resources: 
+    requests: 
+      storage: 100Mi
+  accessModes: 
+    - ReadWriteOnce 
+```
+
+**不绑定到 default StorageClass**
+
+如果希望 PVC 使⽤预先配置的 PV，请将 storageClassName 显式设置为 “”。
+
+```
+vim mongodb-pvc-dp-emptystorageclass.yaml 
+
+apiVersion: v1
+kind: PersistentVolumeClaim   
+metadata:
+  name: mongodb-pvc-emptystorageclass   
+spec:
+  resources: 
+    requests: 
+      storage: 100Mi
+  accessModes: 
+    - ReadWriteOnce 
+  storageClassName: "" 
+```
+
+![[动态卷流程.png]]
+
+
+
+
+
+
+
 
 
 
