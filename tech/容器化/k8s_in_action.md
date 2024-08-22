@@ -2650,6 +2650,67 @@ spec:
 
 ![[动态卷流程.png]]
 
+# ConfigMap & Secret 
+
+通常我们会有以下配置我们的应用方式： 
+
+- 向容器传递命令行参数；
+- 为每个容器设置自定义环境变量；
+- 挂载特殊类型的卷到容器中。 
+
+同时我们也要满足安全的需要，比如有些配置含有证书、私钥等安全数据。
+
+## 命令行参数 
+
+### **Docker** 
+
+1. 利用 Dockerfile 编写 ENTRYPOINT 与 CMD。
+
+- `ENTRYPOINT`：定义容器启动时，被调用的可执行程序；
+- `CMD`：指定传递给 `ENTRYPOINT` 的参数。 
+
+2. 直接运行指定 
+
+```
+docker run <image> <args> 
+```
+
+**shell 与 exec 区别**
+
+- `shell`：ENTRYPOINT node app.js 
+- `exec`：ENTRYPOINT ["node", "app.js" ]
+
+shell 方式，会比 exec 方式多启动一个 shell 进程，这个进程对应用程序是没有用到的，因此比较推荐使用 exec 形式的 ENTRYPOINT 指令。
+
+**准备脚本**
+
+[chapter07]
+
+- 构建镜像 
+
+```
+docker build -t 10.0.88.85:5000/luksa/fortune-args:v1.0 .
+docker push 10.0.88.85:5000/luksa/fortune-args:v1.0
+```
+
+- 测试 
+
+```
+docker run 10.0.88.85:5000/luksa/fortune-args:v1.0 30
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
