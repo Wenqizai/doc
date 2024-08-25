@@ -53,7 +53,7 @@ cp /etc/yum.repos.d/CentOS-Base.repo /etc/yum.repos.d/CentOS-Base.repo.default
 curl -k -o /etc/yum.repos.d/CentOS-Base.repo https://mirrors.aliyun.com/repo/Centos-7.repo
 
 
-cat > /etc/yum.repos.d/kubernetes.repo << EOF
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo 
 [kubernetes]
 name=Kubernetes
 baseurl=https://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64/
@@ -411,7 +411,7 @@ https://projectcalico.docs.tigera.io/getting-started/kubernetes/requirements
 # 下载
 cd /root
 wget -o calico_v3.22.yaml https://docs.projectcalico.org/v3.22/manifests/calico.yaml --no-check-certificate
-vim calico_v3.22.yaml
+vim calico.yaml
 # 去掉下列行注释，定义pod网段
             - name: CALICO_IPV4POOL_CIDR
               value: "172.16.0.0/16"
@@ -471,6 +471,9 @@ kubectl create -f kuboard-v3.yaml
 在浏览器中打开链接 http://your-node-ip-address:30080
 用户名： admin
 初始密码： Kuboard123
+
+# 每次重装之后都需要清理 master 节点上的 kuboard 历史数据, 不然会有奇奇怪怪的问题 
+rm -rf /usr/share/kuboard
 ```
 
 ### 安装 treafik 网关
