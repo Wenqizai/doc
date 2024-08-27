@@ -28,6 +28,8 @@ curl -XGET http://ip:port/v2/<imageName>/tags/list
 
 # 可视化
 
+## Registry-browser
+
 [docker registry（私库）搭建，使用，WEB可视化管理部署 - 老猿新码 - 博客园](https://www.cnblogs.com/netcore3/p/16982828.html)
 [搭建私有Docker Registry和Browser管理 - 月色真美](https://qilinxinan.com/archives/a2ad74b83778473ba975f12561a935c6)
 
@@ -51,4 +53,43 @@ docker run --name registry-browser \
 
 ```
 http://192.168.5.5:8080/
+```
+
+
+##  Portainer
+
+```
+docker pull portainer/portainer:1.25.0
+
+# 启动镜像
+docker run -d -p 9000:9000 --restart=always \
+-v /var/run/docker.sock:/var/run/docker.sock \
+--name portainer portainer/portainer:1.25.0
+
+# 访问  
+http://192.168.5.5:9000/#/containers
+
+```
+
+## 删除镜像 
+
+
+```
+# 1. Registry-browser 获取 sha256 值
+
+# 2. 删除 ubuntu 
+curl -I -X DELETE http://192.168.5.5:5000/v2/ubuntu/manifests/sha256:22ff9671e4e9f972d171514f0e8cd2370020a2a284a694012dc3ba9d1a46cc07
+
+# 3. 进入仓库容器 
+docker exec -it 39d sh
+
+# 4. 查看大小
+du  -chs  /var/lib/registry/ 
+
+# 5. 执行垃圾回收 
+registry garbage-collect /etc/docker/registry/config.yml
+
+# 6. 查看大小 
+du  -chs  /var/lib/registry/ 
+
 ```
