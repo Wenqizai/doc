@@ -62,7 +62,7 @@ showmount -e 10.0.88.85
 - 10.0.88.85 文件系统挂载到 nfs 
 
 ```
-mkdir /mnt/public
+mkdir -p /mnt/nfs/public
 vim /etc/fstab
 	10.0.88.85:/public  /mnt/nfs/public      nfs    defaults 0 0
 mount -a

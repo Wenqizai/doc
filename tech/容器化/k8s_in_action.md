@@ -2124,12 +2124,12 @@ metadata:
   name: fortune 
 spec:
   containers:
-  - image: 10.0.88.85:5000/luksa/fortune:v1.0
+  - image: 192.168.5.5:5000/luksa/fortune:v1.0
     name: html-generator
     volumeMounts: 
     - name: html 
       mountPath: /var/htdocs
-  - image: 10.0.88.85:5000/nginx:1.18
+  - image: 192.168.5.5:5000/nginx:1.18
     name: web-server 
     volumeMounts: 
     - name: html 
@@ -2698,6 +2698,81 @@ docker push 10.0.88.85:5000/luksa/fortune-args:v1.0
 ```
 docker run 10.0.88.85:5000/luksa/fortune-args:v1.0 30
 ```
+
+### Kubernetes 
+
+Kubernetes 传递参数，仅需要再 `spec.containers` 中设置属性 command 和 args 的值即可。其中 args 既可以使用数组，也可以使用 “-” 进行分割。
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: some-pod-name 
+spec:
+  containers:
+  - image: some/image 
+    command: ["/bin/command"]
+    args: ["arg1", "arg2", "arg3"]
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: some-pod-name 
+spec:
+  containers:
+  - image: some/image 
+    command: ["/bin/command"]
+    args: 
+    - "arg1"
+    - "arg2"
+    - "arg3"
+```
+
+**与 Docker 的对比**
+
+| Docker     | Kubernetes | 描述          |
+| ---------- | ---------- | ----------- |
+| ENTRYPOINT | command    | 容器中运行可执行的文件 |
+| CMD        | args       | 传递给可执行文件的参数 |
+
+**构建 Pod**
+
+```
+vim fortune-pod-args.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune2s 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/luksa/fortune-args:v1.0  
+    args: ["2"]
+    name: html-generator
+    volumeMounts: 
+    - name: html 
+      mountPath: /var/htdocs
+ ports:
+  - containerPort: 80
+    protocol: TCP
+volumes: 
+- name: html 
+  emptyDir: {}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
