@@ -2827,13 +2827,74 @@ spec:
 
 此时 Kubernetes 给出一种解决传递配置参数，和解耦的方案：ConfigMap。
 
+## ConfigMap 
+
+配置解耦的目的：
+
+1. 区分多环境；
+2. 从应用代码中抽离；
+3. 可频繁变更配置值。
+
+> ConfigMap 原理
+
+应用无需感知 ConfigMap 的存在，也无需向 ConfigMap 读取配置。ConfigMap 负责管理配置文件，并将配置通过<font color="#c0504d">环境变量或卷</font>的形式传递给 Pod。
+
+容器可以通过读取环境变量，如 $ENV_VAR 和 $ (ENV_VAR)，来获取相关配置值。
+
+⚠️upload failed, check dev console
+![[ConfigMap传递环境变量.png|475]]
+
+**此外**：应用程序也可以通过访问 Kubernetes Rest API 来读取 ConfigMap 的内容。
+
+使用同一个 ConfigMap 名称配置，方便管理不同环境的配置值。
+⚠️upload failed, check dev console
+![[ConfigMap多环境配置.png|500]]
+
+### 创建 ConfigMap 
+
+>简单条目 configmap 
+
+1. 指定 ConfigMap 名称 fortune-config；
+2. 创建 key-value，`sleep-interval=25` ；
+3. 亦可指定创建多个 k-v。
+
+```
+kubectl create configmap fortune-config --from-literal=sleep-interval=25
+
+kubectl create configmap myconfigmap --from-literal=foo=bar --from-literal=bar=baz --from-literal=one=two 
+```
+
+>文件内容 configmap 
 
 
+```
+# key 名称为 config-file.conf
+kubectl create configmap my-config --from-file=config-file.conf 
 
+# 指定 key 名称为 customkey 
+kubectl create configmap my-config-2 --from-file=customkey=config-file.conf 
+```
 
+> 文件夹 configmap 
 
+注意指定文件夹创建 configmap，只会读取当前文件的配置文件，不会递归读取子文件夹得配置文件。
 
+```
+kubectl create configmap my-config-dir --from-file=/usr/local/app/k8s_in_action/configmap/parent 
+```
 
+> 指定多种类型 config 
+
+```
+kubectl create configmap my-config-mix \
+--from-file=foo.json \
+--from-file=bar=foobar.conf \
+--from-file=config-opts \
+--from-literal=some=thing 
+```
+
+⚠️upload failed, check dev console
+![[指定多种方式创建ConfigMap.png|450]]
 
 
 
