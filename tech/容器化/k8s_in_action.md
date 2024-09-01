@@ -2660,7 +2660,7 @@ spec:
 
 同时我们也要满足安全的需要，比如有些配置含有证书、私钥等安全数据。
 
-## 命令行参数 
+## 传递命令行参数 
 
 ### **Docker** 
 
@@ -2721,6 +2721,7 @@ metadata:
 spec:
   containers:
   - image: some/image 
+    name: someName
     command: ["/bin/command"]
     args: 
     - "arg1"
@@ -2752,17 +2753,79 @@ spec:
     volumeMounts: 
     - name: html 
       mountPath: /var/htdocs
- ports:
-  - containerPort: 80
-    protocol: TCP
-volumes: 
-- name: html 
-  emptyDir: {}
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes:
+  - name: html 
+    emptyDir: {}
 ```
 
+## 传递环境变量
+
+**准备脚本**
+
+`fortuneloop-env.sh`
+
+构建新的镜像，`luksa/fortune:env`。
+
+**准备 Pod** 
+
+注入环境变量 `INTERVAL`
+
+```
+vim fortune-pod-env.yaml
 
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-env
+spec:
+  containers:
+  - image: 192.168.5.5:5000/luksa/fortune-env:v1.0  
+    name: html-generator
+    env: 
+    - name: INTERVAL
+      value: "30"
+    volumeMounts: 
+    - name: html 
+      mountPath: /var/htdocs
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes: 
+  - name: html 
+    emptyDir: {}
+```
 
+**环境变量用法**
+
+> 引用其他环境变量 
+
+环境变量 `SECOND_VAR` 的 value 为 `foobar`。
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: some-pod-name 
+spec:
+  containers:
+  - image: some/image 
+    name: someName
+    env: 
+    - name: FIRST_VAR 
+      value: "foo" 
+    - name: SECOND_VAR 	
+      value: "$(FIRST_VAR)bar"
+```
+
+**总结**
+
+无论从传递参数，还是设置环境变量，都是采用硬编码的形式。当我们大量使用这种硬编码，会加重我们的运维开发的负担，同时需要管理起来不同环境的环境变量。
+
+此时 Kubernetes 给出一种解决传递配置参数，和解耦的方案：ConfigMap。
 
 
 
