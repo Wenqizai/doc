@@ -2995,11 +2995,73 @@ apiVersion: v1
        protocol: TCP
 ```
 
+### 卷文件方式 
 
+ConfigMap 卷会将 ConfigMap 中的每个条目均暴露成一个文件，运行再容器中的进程可通过读取文件内容获得对应的条目值。 
 
+**创建**
 
+```
+vim my-nginx-config.conf 
 
+# 开启对文本文件和 xml 文件进行 gzip 压缩
+server {
+  listen 80;
+  server_name www.kubia-example.com 
 
+  gzip on;
+  gzip_types text/plain application/xml text/html;
+
+  location / {
+    root  /usr/share/nginx/html;
+    index index.html index.htm;
+  }
+}
+
+# 另一个文件 
+vim sleep-interval
+
+25 
+
+# 创建 configmap
+kubectl create configmap fortune-config --from-file=configmap-files
+```
+
+**挂载 Nginx 配置文件目录 conf.d**
+
+将 fortune-config configMap 挂载到容器 nginx 的文件夹 ` /etc/nginx/conf.d` 下。
+
+```
+vim fortune-pod-configmap-volume.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-configmap-volume 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/nginx:1.18  
+    name: web-server 
+    volumeMounts: 
+      - name: config  
+        mountPath: /etc/nginx/conf.d
+        readOnly: true 
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes: 
+  - name: config  
+    configMap: 
+      name: fortune-config 
+```
+
+**测试是否挂载成功** 
+
+```
+kubectl port-forward fortune-configmap-volume 8081:80 
+
+curl -H "Accept-Encoding: gzip" -I www.kubia-example.com:8081 
+```
 
 
 

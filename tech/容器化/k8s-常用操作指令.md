@@ -314,6 +314,16 @@ kubectl delete pv <pvName>
 kubectl delete pvc <pvcName>
 ```
 
+# ConfigMap
+
+```
+kubectl create configmap <name> --from-literal=<key>=<value>
+kubectl create configmap <name> --from-file=<key>=<filename> 
+kubectl create configmap <name> --from-file=<dirName>
+
+kubectl delete configmap <name>
+
+```
 # 插件
 
 ## Krew 
