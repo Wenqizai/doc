@@ -2896,9 +2896,104 @@ kubectl create configmap my-config-mix \
 ⚠️upload failed, check dev console
 ![[指定多种方式创建ConfigMap.png|450]]
 
+### 环境变量方式 
 
+>1. 读取指定的 ConfigMap value
 
+使用属性字段：`valueFrom`，读取 configmap 配置文件内容。
 
+```
+vim fortune-pod-env-configmap.yaml 
+
+apiVersion: v1
+ kind: Pod
+ metadata:
+   name: fortune-env-from-configmap 
+ spec:
+   containers:
+   - image: 192.168.5.5:5000/luksa/fortune-env:v1.0  
+     name: html-generator
+     env: 
+     - name: INTERVAL
+       valueFrom: 
+         configMapKeyRef: 
+           name: fortune-config 
+           key: sleep-interval 
+     ports:
+     - containerPort: 80
+       protocol: TCP
+```
+
+⚠️upload failed, check dev console
+![[Pod读取configmap.png|500]]
+
+如果关联得 configmap 不存在，则容器启动失败，等待 configmap 创建之后才能启动成功。如果设置属性 `configMapKeyRef.optional:true`，则不会强校验 configmap。
+
+**注意：** 修改了 configmap 后，不重启 Pod，则环境变量不会变更。
+
+> 2. 读取整个 ConfigMap 的 value
+
+从 configmap 为 `my-config-map` 中获取 key 得前缀为 `CONFIG_` 得环境变量。此时属性使用 `envFrom` 而不是 `env`。
+
+```
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-env-from-configmap 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/luksa/fortune-env:v1.0  
+    name: html-generator
+    envFrom: 
+    - prefix: CONFIG_
+      configMapKeyRef: 
+        name: my-config-map 
+    ports:
+    - containerPort: 80
+      protocol: TCP
+```
+
+**注意：** 前缀设置是可选的，若不设置前缀值，环境变量的名称与 ConfigMap 中的键名相同。
+
+**大坑：** `CONFIG_FOO-BAR` 作为 key 是不能读取和识别的。因为这不是一个合法的环境变量命名，Kubernetes 遇到不合法的环境变量时会直接丢弃和忽略，不会有时间通知。
+
+环境变量命名规则：
+
+1. **只能包含大写字母(A-Z)、数字(0-9)和下划线(`_`)**:
+    - 不能包含小写字母、空格或其他特殊字符。
+2. **不能以数字开头**:
+    - 环境变量名称的第一个字符必须是字母或下划线。 
+3. **建议使用全大写字母**:
+    - 虽然环境变量名称不区分大小写,但通常建议使用全大写字母,以便于识别和区分。
+4. **使用下划线(`_`)分隔单词**:
+    - 如果环境变量名称由多个单词组成,建议使用下划线(`_`)分隔,而不是使用驼峰命名法。
+
+**传递 ConfigMap 的条目给容器参数**
+
+此时的容器不是读取环境变量 `INTERVAL`，而是通过读取启动参数 args 方式。
+
+```
+vim fortune-pod-args-configmap.yaml 
+
+apiVersion: v1
+ kind: Pod
+ metadata:
+   name: fortune-args-from-configmap 
+ spec:
+   containers:
+   - image: 192.168.5.5:5000/luksa/fortune-args:v1.0  
+     name: html-generator
+     env: 
+     - name: INTERVAL
+       valueFrom: 
+         configMapKeyRef: 
+           name: fortune-config 
+           key: sleep-interval  
+     args: ["$(INTERVAL)"]
+     ports:
+     - containerPort: 80
+       protocol: TCP
+```
 
 
 
