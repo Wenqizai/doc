@@ -1,3 +1,68 @@
+# Docker 安装 
+
+参看官方文档：[Install Docker Engine on CentOS | Docker Docs](https://docs.docker.com/engine/install/centos/#install-using-the-repository)
+
+- 移除旧依赖
+
+```console
+ sudo yum remove docker \
+                  docker-client \
+                  docker-client-latest \
+                  docker-common \
+                  docker-latest \
+                  docker-latest-logrotate \
+                  docker-logrotate \
+                  docker-engine
+```
+
+- 添加 yum 源
+
+```
+sudo yum install -y yum-utils
+
+# 官方
+sudo yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+# aliyun 
+yum-config-manager  --add-repo  http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+```
+
+- 安装启动 
+
+```
+yum install -y docker-ce-20.10.* docker-ce-cli-20.10.* 
+ 
+# 配置cgroup和datadir，一般/data需要另外挂载data数据盘
+mkdir -p /etc/docker /data/docker
+ 
+cat > /etc/docker/daemon.json <<EOF
+{
+  "data-root": "/data/docker",
+  "insecure-registries":["http://192.168.5.10:5000"],
+  "registry-mirrors": [
+  		"https://dockerhub.icu",
+        "https://docker.anyhub.us.kg",
+        "https://docker.fxxk.dedyn.io"
+  ],
+  "exec-opts": ["native.cgroupdriver=systemd"],
+  "log-driver": "json-file",
+  "log-opts": {
+    "max-size": "100m"
+  },
+  "storage-driver": "overlay2",
+  "storage-opts": [
+    "overlay2.override_kernel_check=true"
+  ]
+}
+EOF
+ 
+# 启动
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+
+systemctl daemon-reload && systemctl enable --now docker
+```
+
 # 搭建
 
 [搭建docker镜像仓库(一)：使用registry搭建本地镜像仓库 - 人生的哲理 - 博客园](https://www.cnblogs.com/renshengdezheli/p/16646969.html)
@@ -24,7 +89,6 @@ docker push 192.168.5.5:5000/kubia:v1.0
 curl -XGET http://ip:port/v2/_catalog
 curl -XGET http://ip:port/v2/<imageName>/tags/list
 ```
-
 
 # 可视化
 
