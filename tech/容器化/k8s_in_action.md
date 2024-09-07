@@ -3007,10 +3007,10 @@ vim my-nginx-config.conf
 # 开启对文本文件和 xml 文件进行 gzip 压缩
 server {
   listen 80;
-  server_name www.kubia-example.com 
+  server_name www.kubia-example.com;
 
   gzip on;
-  gzip_types text/plain application/xml text/html;
+  gzip_types text/plain application/xml;
 
   location / {
     root  /usr/share/nginx/html;
@@ -3060,7 +3060,7 @@ spec:
 ```
 kubectl port-forward fortune-configmap-volume 8081:80 
 
-curl -H "Accept-Encoding: gzip" -I www.kubia-example.com:8081 
+curl -H "accept-encoding:gzip" -H "host:www.kubia-example.com" -I http://127.0.0.1:8081
 ```
 
 
