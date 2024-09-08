@@ -3120,30 +3120,214 @@ spec:
 
 **注意**：配置完 ConfigMap 不重启 Pod，基本上获取不到新的发生变化的配置。
 
+## Secret 
+
+Secret，本质上和 ConfigMap 类似，都是一种配置资源。Secret，设计的目的是用来传递一些敏感的数据，如证书、私钥等。
+
+Secret，只会被分发到访问 Secret 的 Pod 所在的机器节点上。此外 Secret 只会存储在节点的内存中，不会写入磁盘（删除时就不用擦除磁盘了），来保证其安全性。
+
+### 默认 Secret 
+
+当我们执行以下命令，可以看到每个 Pod 都有默认的 Secret，挂载文件夹 ` /var/run/secrets/kubernetes.io/serviceaccount/`。
+
+```
+kubectl describe po 
+kubectl get secrets 
+kubectl describe secrets 
+```
+
+默认的 secrets 包含以下三个条目，k-v 结构。
+
+```
+ca.crt
+namespace 
+token 
+```
+
+执行以下命令：
+
+```
+kubectl exec -it fortune-configmap-subpath-volume  -- ls -l  /var/run/secrets/kubernetes.io/serviceaccount
+```
+
+输出：
+
+```
+drwxr-xr-x    2 root     root           100 Sep  8 03:30 ..2024_09_08_03_30_42.106424160
+lrwxrwxrwx    1 root     root            31 Sep  8 03:30 ..data -> ..2024_09_08_03_30_42.106424160
+lrwxrwxrwx    1 root     root            13 Sep  8 03:30 ca.crt -> ..data/ca.crt
+lrwxrwxrwx    1 root     root            16 Sep  8 03:30 namespace -> ..data/namespace
+lrwxrwxrwx    1 root     root            12 Sep  8 03:30 token -> ..data/token
+```
+
+可以看到被挂载的 Secrets 卷（ConfigMap 同理）中的⽂件是 `..data` ⽂件夹中⽂件的符号链接，⽽ `..data` ⽂件夹同样是 `..4984_09_04_something` 的符号链接。
+
+每当 Secrets 卷（ConfigMap 同理） 被更新后，Kubernetes 会创建⼀个这样的⽂件夹，写⼊所有⽂件并重新将符号 `..data` 链接⾄新⽂件夹，通过这种⽅式可以⼀次性修改所有⽂件。
+
+*Pod，可以通过这些 Secrets 挂载的文件来访问 API 服务器。*
+
+⚠️upload failed, check dev console
+![[secrets-defaultToken挂载文件.png]]
+
+### 创建 Secrets 
+
+- 生成证书和密钥 
+
+```
+openssl genrsa -out https.key 2048 
+openssl req -new -x509 -key https.key -out https.cert -days 3650 -subj "/CN=www.kubia-example.com" 
+```
+
+- 准备文件 
+
+```
+echo bar > foo 
+```
+
+- 创建 secrets，基于以上的三个文件 
+
+这里创建了 `fortune-https` 的 generic Secret，包含两个条目：https.key 和 https.cert。
+
+```
+kubectl create secret generic fortune-https --from-file=https.key --from-file=https.cert --from-file=foo 
+```
+
+- 查看创建的 secrets 
+
+```
+kubectl get secrets fortune-https -o yaml | kubectl neat 
+```
+
+与 ConfigMap 明文展示不同，Secrets 的 data 部分都是经过 base 64 编码。因此，Secret 可以存储二进制数据。但是大小不可以超过 1 M。
+
+**存储非 base 64 数据**
+
+一般来说，Secrets 存储的数据都是经过 Base 64 进行编码的。我们在设置或读取相关条目是，要对内容进行编解码。
+
+如果我们想要明文纯文本存储数据时，可以借助属性 `stringdata`。
+
+```
+apiVersion: v1
+stringData: 
+  foo: plain text 
+data:
+  https.cert: LS0tLS1.....
+  https.key: LS0tLS1.....
+kind: Secret
+metadata:
+  name: fortune-https
+  namespace: default
+type: Opaque
+```
+
+### 使用 Secrets 
+
+上述我们以见创建相应的证书和密钥，fortune-https Secrets，现在可以配置 Nginx 服务器，让其接收 https 相关的请求。
+
+- 修改 Nginx configMap 
+
+```
+kubectl edict configmap fortune-config 
+```
+
+- 修改配置文件中的条目，my-nginx-config.conf。
+
+Nginx 配置了 ssl，并将密钥保存至目录 `/etc/nginx/certs`，因此我们相关的 Secret 也要挂载到这个目录。
+
+```
+server {
+  listen 80;
+  listen 443 ssl;
+  server_name www.kubia-example.com;
+
+  ssl_certificate      certs/https.cert;
+  ssl_certificate_key  certs/https.key;
+  ssl_protocols        TLSv1 TLSv1.1 TLSv1.2;
+  ssl_ciphers          HIGH:!aNULL:!MD5;
+  
+  gzip on;
+  gzip_types text/plain application/xml;
+
+  location / {
+    root  /usr/share/nginx/html;
+    index index.html index.htm;
+  }
+}
+```
+
+- 创建支持 https 的 Pod，并将证书和密钥的 Secret 卷挂载到 Pod 的 web-server 容器中。
+
+```
+vim fortune-pod-https.yaml 
 
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-https  
+spec:
+  containers:
+  - image: 192.168.5.5:5000/luksa/fortune-env:v1.0   
+    name: html-generator 
+    env: 
+    - name: INTERVAL 
+      valueFrom: 
+        configMapKeyRef: 
+          name: fortune-config 
+          key: sleep-interval         
+    volumeMounts: 
+      - name: html   
+        mountPath: /var/htdocs 
+  - image: 192.168.5.5:5000/nginx:alpine  
+    name: web-server 
+    volumeMounts: 
+      - name: html   
+        mountPath: /usr/share/nginx/html 
+        readOnly: true 
+      - name: config    
+        mountPath: /etc/nginx/conf.d/gzip-ssl.conf 
+        subPath: my-nginx-config.conf
+        readOnly: true 
+      - name: certs     
+        mountPath: /etc/nginx/certs   
+        readOnly: true 
+    ports:
+    - containerPort: 80
+    - containerPort: 443 
+  volumes: 
+  - name: html 
+    emptyDir: {}
+  - name: config  
+    configMap: 
+      name: fortune-config 
+  - name: certs 
+    secret: 
+      secretName: fortune-https 
+```
 
+- 测试  
 
+```
+# 转发端口 
+kubectl port-forward fortune-https 8443:443  
 
+curl -H "host:www.kubia-example.com"  https://127.0.0.1:8443 -k -v
+```
 
+⚠️upload failed, check dev console
+![[configmap和secret挂载.png]]
 
+**查看 secret 挂载**
 
+使用的是 tmpfs，存储在 secret 的数据是不会写入到磁盘中。
 
+```
+kubectl exec fortune-https -c web-server -- mount | grep certs 
 
+# 输出 => 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+tmpfs on /etc/nginx/certs type tmpfs (ro,relatime,size=3912800k)
+```
 
 
 
