@@ -3063,12 +3063,62 @@ kubectl port-forward fortune-configmap-volume 8081:80
 curl -H "accept-encoding:gzip" -H "host:www.kubia-example.com" -I http://127.0.0.1:8081
 ```
 
+**指定挂载 configmap 的条目**
+
+当我们不指定 items 属性时，configMap 配置的所有条目都会被挂载到容器中。如下，我们可以指定挂载 `my-nginx-config.conf` 条目到容器中。
+
+启动 Pod 之后，我们可以看到 `/etc/nginx/conf.d/gizp.conf` 被挂载进去。
+
+```
+volumes: 
+- name: config  
+  configMap: 
+    name: fortune-config 
+	items: 
+	- key: my-nginx-config.conf 
+	  path: gzip.conf 
+```
+
+**configmap 条目独立挂载，不影响到其他**
+
+当我们挂载 configMap 到文件夹 `/etc/nginx/conf.d/` 时，我们发现文件夹下仅有 configMap 相关的条目，而 `/etc/nginx/conf.d/` 下原有的条目被隐藏了。
+
+这种方式会导致一些配置文件丢失的问题，因此我们更希望 configMap 可以独立挂载进文件夹而不能影响到其他的条目。利用 `spec.containers.volumeMounts.subpath` 属性来完成该功能。
+
+**注意：** `mountPath` 属性是*挂载某一个文件*，而不是文件价。`subPath`  属性是指定 configMap 某一个 key。同时我们也可以设置 `defaultMode` 属性来修改配置文件，文件默认是 read only。
 
 
+```
+vim fortune-pod-configmap-subpath-volume.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-configmap-subpath-volume 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/nginx:alpine  
+    name: web-server 
+    volumeMounts: 
+      - name: config  
+        mountPath: /etc/nginx/conf.d/gzip.conf
+        subPath: my-nginx-config.conf 
+        readOnly: true 
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes: 
+  - name: config  
+    configMap: 
+      name: fortune-config 
+      defaultMode: 0664 
+```
 
 
+⚠️upload failed, check dev console
+![[configmap单独挂载文件.png]]
 
-
+**注意**：配置完 ConfigMap 不重启 Pod，基本上获取不到新的发生变化的配置。
 
 
 
