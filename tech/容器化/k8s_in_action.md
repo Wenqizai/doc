@@ -3329,6 +3329,86 @@ kubectl exec fortune-https -c web-server -- mount | grep certs
 tmpfs on /etc/nginx/certs type tmpfs (ro,relatime,size=3912800k)
 ```
 
+# 访问资源信息
+
+目前为止，我们可以在应用内部通过环境变量和挂载卷的方式来获取到 Kubernetes 的一些信息。但一些资源信息、或者其他 Pod 的元数据是没办法获取到的。下面就开始了解，如何在应用内获取到这些相关信息。
+
+## Downward API
+
+Kuberneter Downward API 通过*环境变量或者 downward API 卷文件*的方式来传递 Pod 的元数据。
+
+意味者 Pod 就可以通过环境变量或卷文件来访问到其他 Pod 的运行产生的数据。
+
+⚠️upload failed, check dev console
+![[DownwardAPI传递数据.png]]
+
+### 可传递的数据
+
+Downward API 可传递给 Pod 的数据包括以下：
+
+- Pod 的名称 
+- Pod 的 IP 
+- Pod 的所在 NameSpace
+- Pod 运行节点的名称 
+- Pod 运行所归属的服务账号的名称 
+- 每个容器请求的 CPU 和内存的适用量
+- 每个容器可以使用的 CPU 和内存的限制
+- Pod 的标签 
+- Pod 的注解 
+
+### 环境变量方式传递
+
+```
+vim downward-api-env.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downward   
+spec:
+  containers:
+  - image: 192.168.5.5:5000/busybox:1.36   
+    command: ["sleep", "9999999"] 
+	resources: 
+	  requests: 
+	    cpu: 15m 
+	    memory: 100ki 
+	  limits: 
+	    cpu: 100m 
+     	memory: 4Mi  
+    env: 
+    - name: POD_NAME  
+      valueFrom: 
+        fieldRef: 
+          fieldPath: metadata.name # 引用Pod的元数据字段，而不是设定一个具体的值
+    - name: POD_NAMESPACE   
+      valueFrom: 
+        fieldRef: 
+          fieldPath: metadata.namespace  
+	- name: POD_IP    
+	  valueFrom: 
+	    fieldRef: 
+	      fieldPath: status.podIP 
+	- name: NODE_NAME     
+	  valueFrom: 
+	    fieldRef: 
+	      fieldPath: spec.nodeName 
+    - name: SERVICE_ACCOUNT 
+      valueFrom: 
+        fieldRef: 
+          fieldPath: spec.serviceAccountName 
+    - name: CONTAINER_CPU_REQUEST_MILLICORES  
+      valueFrom: 
+        resourceFieldRef: 
+          resource: requests.cpu 
+          divisor: 1m 
+     - name: CONTAINER_MEMORY_LIMIT_KIBIBYTES
+     valueFrom: 
+	   resourceFieldRef: 
+         resource: limits.memory  
+         divisor: 1ki
+```
+
 
 
 
