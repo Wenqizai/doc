@@ -3,20 +3,20 @@
 
 > 准备机器
 
-| Hostname     | IP         | Role   |
-| ------------ | ---------- | ------ |
-| k 8 s_master | 10.0.88.85 | Master |
-| k 8 s_node 1 | 10.0.88.84 | Node   |
-| k 8 s_node 2 | 10.0.88.83 | Node   |
+| Hostname   | IP          | Role   |
+| ---------- | ----------- | ------ |
+| k8s_master | 192.168.5.5 | Master |
+| k8s_node01 | 192.168.5.3 | Node   |
+| k8s_node02 | 192.168.5.4 | Node   |
 
-| **配置信息**     |                                                                  |
-| ------------ | ---------------------------------------------------------------- |
-| 系统版本         | CentOS 7.9                                                       |
-| Docker版本     | 20.10.x                                                          |
-| kubernetes版本 | v1.22.x                                                          |
-| node服务器网段    | 10.0.88.85<br>10.0.88.84<br>10.0.88.83<br><br>实际随网络规划，与下面网段不冲突即可 |
-| Pod网段        | 172.16.0.0/16                                                    |
-| Service网段    | 192.168.0.0/16                                                   |
+| **配置信息**     |                                                                     |
+| ------------ | ------------------------------------------------------------------- |
+| 系统版本         | CentOS 7.9                                                          |
+| Docker版本     | 20.10.x                                                             |
+| kubernetes版本 | v1.22.x                                                             |
+| node服务器网段    | 192.168.5.5<br>192.168.5.3<br>192.168.5.4<br><br>实际随网络规划，与下面网段不冲突即可 |
+| Pod网段        | 172.16.0.0/16                                                       |
+| Service网段    | 192.168.0.0/16                                                      |
 
 > 检查机器 product_uuid, 确保不相同
 
@@ -40,9 +40,9 @@ hostnamectl set-hostname k8sNode2
 vim /etc/hosts
 
 # for k8s-cluster
-10.0.88.85 k8sMaster
-10.0.88.83 k8sNode1
-10.0.88.84 k8sNode2
+192.168.5.5 k8sMaster
+192.168.5.3 k8sNode1
+192.168.5.4 k8sNode2
 ```
 
 > 配置 yum 源
@@ -276,7 +276,6 @@ EOF
 # 启动
 sudo systemctl daemon-reload
 sudo systemctl restart docker
-sudo systemctl restart kubelet
 
 systemctl daemon-reload && systemctl enable --now docker
 ```
@@ -294,6 +293,8 @@ yum install kubeadm-1.22* kubelet-1.22* kubectl-1.22* -y
  
 # 设置kubelet开机启动，目前无法启动因为未初始化，忽略报错
 systemctl daemon-reload && systemctl enable --now kubelet
+
+sudo systemctl restart kubelet
 ```
 
 > 集群初始化
@@ -315,23 +316,23 @@ bootstrapTokens:
   - authentication
 kind: InitConfiguration
 localAPIEndpoint:
-  advertiseAddress: 10.0.88.85      # Master 节点 IP
+  advertiseAddress: 192.168.5.5      # Master 节点 IP
   bindPort: 6443
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
-  name: k8sMaster       # Master 节点名称
+  name: k8s_master       # Master 节点名称
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
 ---
 apiServer:
   certSANs:
-  - 10.0.88.85      # Master 节点 IP
+  - 192.168.5.5      # Master 节点 IP
   timeoutForControlPlane: 4m0s
 apiVersion: kubeadm.k8s.io/v1beta2
 certificatesDir: /etc/kubernetes/pki
 clusterName: kubernetes     # 集群名称
-controlPlaneEndpoint: 10.0.88.85:6443       # Master 节点 IP
+controlPlaneEndpoint: 192.168.5.5:6443       # Master 节点 IP
 controllerManager: {}
 dns:
   type: CoreDNS
@@ -375,7 +376,7 @@ sudo chown $(id -u):$(id -g) $HOME/.kube/config
 2. 加了入成为 Master 节点执行（1 Master 无需执行这个）
 
 ```
-kubeadm join 10.0.88.85:6443 --token 7t2weq.bjbawausm0jaxury \
+kubeadm join 192.168.5.5:6443 --token 7t2weq.bjbawausm0jaxury \
       --discovery-token-ca-cert-hash sha256:af6d45c048f8b5dbfcedbe14b4b2867d8012cabe7d72ddf36eccb55c6893be7b \
       --control-plane --certificate-key e261f48b192ab7c55d10a85ced18e39ad42cb52d78c238e322a33081a59fe41c
 ```
@@ -383,7 +384,7 @@ kubeadm join 10.0.88.85:6443 --token 7t2weq.bjbawausm0jaxury \
 1. 加入成为 Node 节点执行
 
 ```
-kubeadm join 10.0.88.85:6443 --token 7t2weq.bjbawausm0jaxury \
+kubeadm join 192.168.5.5:6443 --token 7t2weq.bjbawausm0jaxury \
 --discovery-token-ca-cert-hash sha256:af6d45c048f8b5dbfcedbe14b4b2867d8012cabe7d72ddf36eccb55c6893be7b
 ```
 
@@ -434,8 +435,11 @@ cd /root
 wget -O metrics-server-components.yaml --no-check-certificate https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
 
 
-sed -i 's/k8s.gcr.io/metrics-server/registry.cn-hangzhou.aliyuncs.com/google_containers/g' metrics-server-components.yaml
- 
+sed -i 's#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g' metrics-server-components.yaml
+
+sed -i 's#registry.k8s.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g' metrics-server-components.yaml
+
+
 # 添加kubelet-insecure-tls
 vim metrics-server-components.yaml
 ...
