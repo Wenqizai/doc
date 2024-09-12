@@ -3007,10 +3007,10 @@ vim my-nginx-config.conf
 # 开启对文本文件和 xml 文件进行 gzip 压缩
 server {
   listen 80;
-  server_name www.kubia-example.com 
+  server_name www.kubia-example.com;
 
   gzip on;
-  gzip_types text/plain application/xml text/html;
+  gzip_types text/plain application/xml;
 
   location / {
     root  /usr/share/nginx/html;
@@ -3060,40 +3060,354 @@ spec:
 ```
 kubectl port-forward fortune-configmap-volume 8081:80 
 
-curl -H "Accept-Encoding: gzip" -I www.kubia-example.com:8081 
+curl -H "accept-encoding:gzip" -H "host:www.kubia-example.com" -I http://127.0.0.1:8081
+```
+
+**指定挂载 configmap 的条目**
+
+当我们不指定 items 属性时，configMap 配置的所有条目都会被挂载到容器中。如下，我们可以指定挂载 `my-nginx-config.conf` 条目到容器中。
+
+启动 Pod 之后，我们可以看到 `/etc/nginx/conf.d/gizp.conf` 被挂载进去。
+
+```
+volumes: 
+- name: config  
+  configMap: 
+    name: fortune-config 
+	items: 
+	- key: my-nginx-config.conf 
+	  path: gzip.conf 
+```
+
+**configmap 条目独立挂载，不影响到其他**
+
+当我们挂载 configMap 到文件夹 `/etc/nginx/conf.d/` 时，我们发现文件夹下仅有 configMap 相关的条目，而 `/etc/nginx/conf.d/` 下原有的条目被隐藏了。
+
+这种方式会导致一些配置文件丢失的问题，因此我们更希望 configMap 可以独立挂载进文件夹而不能影响到其他的条目。利用 `spec.containers.volumeMounts.subpath` 属性来完成该功能。
+
+**注意：** `mountPath` 属性是*挂载某一个文件*，而不是文件价。`subPath`  属性是指定 configMap 某一个 key。同时我们也可以设置 `defaultMode` 属性来修改配置文件，文件默认是 read only。
+
+
+```
+vim fortune-pod-configmap-subpath-volume.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-configmap-subpath-volume 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/nginx:alpine  
+    name: web-server 
+    volumeMounts: 
+      - name: config  
+        mountPath: /etc/nginx/conf.d/gzip.conf
+        subPath: my-nginx-config.conf 
+        readOnly: true 
+    ports:
+    - containerPort: 80
+      protocol: TCP
+  volumes: 
+  - name: config  
+    configMap: 
+      name: fortune-config 
+      defaultMode: 0664 
 ```
 
 
+⚠️upload failed, check dev console
+![[configmap单独挂载文件.png]]
+
+**注意**：配置完 ConfigMap 不重启 Pod，基本上获取不到新的发生变化的配置。
+
+## Secret 
+
+Secret，本质上和 ConfigMap 类似，都是一种配置资源。Secret，设计的目的是用来传递一些敏感的数据，如证书、私钥等。
+
+Secret，只会被分发到访问 Secret 的 Pod 所在的机器节点上。此外 Secret 只会存储在节点的内存中，不会写入磁盘（删除时就不用擦除磁盘了），来保证其安全性。
+
+### 默认 Secret 
+
+当我们执行以下命令，可以看到每个 Pod 都有默认的 Secret，挂载文件夹 ` /var/run/secrets/kubernetes.io/serviceaccount/`。
+
+```
+kubectl describe po 
+kubectl get secrets 
+kubectl describe secrets 
+```
+
+默认的 secrets 包含以下三个条目，k-v 结构。
+
+```
+ca.crt
+namespace 
+token 
+```
+
+执行以下命令：
+
+```
+kubectl exec -it fortune-configmap-subpath-volume  -- ls -l  /var/run/secrets/kubernetes.io/serviceaccount
+```
+
+输出：
+
+```
+drwxr-xr-x    2 root     root           100 Sep  8 03:30 ..2024_09_08_03_30_42.106424160
+lrwxrwxrwx    1 root     root            31 Sep  8 03:30 ..data -> ..2024_09_08_03_30_42.106424160
+lrwxrwxrwx    1 root     root            13 Sep  8 03:30 ca.crt -> ..data/ca.crt
+lrwxrwxrwx    1 root     root            16 Sep  8 03:30 namespace -> ..data/namespace
+lrwxrwxrwx    1 root     root            12 Sep  8 03:30 token -> ..data/token
+```
+
+可以看到被挂载的 Secrets 卷（ConfigMap 同理）中的⽂件是 `..data` ⽂件夹中⽂件的符号链接，⽽ `..data` ⽂件夹同样是 `..4984_09_04_something` 的符号链接。
+
+每当 Secrets 卷（ConfigMap 同理） 被更新后，Kubernetes 会创建⼀个这样的⽂件夹，写⼊所有⽂件并重新将符号 `..data` 链接⾄新⽂件夹，通过这种⽅式可以⼀次性修改所有⽂件。
+
+*Pod，可以通过这些 Secrets 挂载的文件来访问 API 服务器。*
+
+⚠️upload failed, check dev console
+![[secrets-defaultToken挂载文件.png]]
+
+### 创建 Secrets 
+
+- 生成证书和密钥 
+
+```
+openssl genrsa -out https.key 2048 
+openssl req -new -x509 -key https.key -out https.cert -days 3650 -subj "/CN=www.kubia-example.com" 
+```
+
+- 准备文件 
+
+```
+echo bar > foo 
+```
+
+- 创建 secrets，基于以上的三个文件 
+
+这里创建了 `fortune-https` 的 generic Secret，包含两个条目：https.key 和 https.cert。
+
+```
+kubectl create secret generic fortune-https --from-file=https.key --from-file=https.cert --from-file=foo 
+```
+
+- 查看创建的 secrets 
+
+```
+kubectl get secrets fortune-https -o yaml | kubectl neat 
+```
+
+与 ConfigMap 明文展示不同，Secrets 的 data 部分都是经过 base 64 编码。因此，Secret 可以存储二进制数据。但是大小不可以超过 1 M。
+
+**存储非 base 64 数据**
+
+一般来说，Secrets 存储的数据都是经过 Base 64 进行编码的。我们在设置或读取相关条目是，要对内容进行编解码。
+
+如果我们想要明文纯文本存储数据时，可以借助属性 `stringdata`。
+
+```
+apiVersion: v1
+stringData: 
+  foo: plain text 
+data:
+  https.cert: LS0tLS1.....
+  https.key: LS0tLS1.....
+kind: Secret
+metadata:
+  name: fortune-https
+  namespace: default
+type: Opaque
+```
+
+### 使用 Secrets 
+
+上述我们以见创建相应的证书和密钥，fortune-https Secrets，现在可以配置 Nginx 服务器，让其接收 https 相关的请求。
+
+- 修改 Nginx configMap 
+
+```
+kubectl edict configmap fortune-config 
+```
+
+- 修改配置文件中的条目，my-nginx-config.conf。
+
+Nginx 配置了 ssl，并将密钥保存至目录 `/etc/nginx/certs`，因此我们相关的 Secret 也要挂载到这个目录。
+
+```
+server {
+  listen 80;
+  listen 443 ssl;
+  server_name www.kubia-example.com;
+
+  ssl_certificate      certs/https.cert;
+  ssl_certificate_key  certs/https.key;
+  ssl_protocols        TLSv1 TLSv1.1 TLSv1.2;
+  ssl_ciphers          HIGH:!aNULL:!MD5;
+  
+  gzip on;
+  gzip_types text/plain application/xml;
+
+  location / {
+    root  /usr/share/nginx/html;
+    index index.html index.htm;
+  }
+}
+```
+
+- 创建支持 https 的 Pod，并将证书和密钥的 Secret 卷挂载到 Pod 的 web-server 容器中。
+
+```
+vim fortune-pod-https.yaml 
 
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fortune-https  
+spec:
+  containers:
+  - image: 192.168.5.5:5000/luksa/fortune-env:v1.0   
+    name: html-generator 
+    env: 
+    - name: INTERVAL 
+      valueFrom: 
+        configMapKeyRef: 
+          name: fortune-config 
+          key: sleep-interval         
+    volumeMounts: 
+      - name: html   
+        mountPath: /var/htdocs 
+  - image: 192.168.5.5:5000/nginx:alpine  
+    name: web-server 
+    volumeMounts: 
+      - name: html   
+        mountPath: /usr/share/nginx/html 
+        readOnly: true 
+      - name: config    
+        mountPath: /etc/nginx/conf.d/gzip-ssl.conf 
+        subPath: my-nginx-config.conf
+        readOnly: true 
+      - name: certs     
+        mountPath: /etc/nginx/certs   
+        readOnly: true 
+    ports:
+    - containerPort: 80
+    - containerPort: 443 
+  volumes: 
+  - name: html 
+    emptyDir: {}
+  - name: config  
+    configMap: 
+      name: fortune-config 
+  - name: certs 
+    secret: 
+      secretName: fortune-https 
+```
 
+- 测试  
 
+```
+# 转发端口 
+kubectl port-forward fortune-https 8443:443  
 
+curl -H "host:www.kubia-example.com"  https://127.0.0.1:8443 -k -v
+```
 
+⚠️upload failed, check dev console
+![[configmap和secret挂载.png]]
 
+**查看 secret 挂载**
 
+使用的是 tmpfs，存储在 secret 的数据是不会写入到磁盘中。
 
+```
+kubectl exec fortune-https -c web-server -- mount | grep certs 
 
+# 输出 => 
 
+tmpfs on /etc/nginx/certs type tmpfs (ro,relatime,size=3912800k)
+```
 
+# 访问资源信息
 
+目前为止，我们可以在应用内部通过环境变量和挂载卷的方式来获取到 Kubernetes 的一些信息。但一些资源信息、或者其他 Pod 的元数据是没办法获取到的。下面就开始了解，如何在应用内获取到这些相关信息。
 
+## Downward API
 
+Kuberneter Downward API 通过*环境变量或者 downward API 卷文件*的方式来传递 Pod 的元数据。
 
+意味者 Pod 就可以通过环境变量或卷文件来访问到其他 Pod 的运行产生的数据。
 
+⚠️upload failed, check dev console
+![[DownwardAPI传递数据.png]]
 
+### 可传递的数据
 
+Downward API 可传递给 Pod 的数据包括以下：
 
+- Pod 的名称 
+- Pod 的 IP 
+- Pod 的所在 NameSpace
+- Pod 运行节点的名称 
+- Pod 运行所归属的服务账号的名称 
+- 每个容器请求的 CPU 和内存的适用量
+- 每个容器可以使用的 CPU 和内存的限制
+- Pod 的标签 
+- Pod 的注解 
 
+### 环境变量方式传递
 
+```
+vim downward-api-env.yaml 
 
-
-
-
-
-
-
-
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downward   
+spec:
+  containers:
+  - image: 192.168.5.5:5000/busybox:1.36   
+    command: ["sleep", "9999999"] 
+	resources: 
+	  requests: 
+	    cpu: 15m 
+	    memory: 100ki 
+	  limits: 
+	    cpu: 100m 
+     	memory: 4Mi  
+    env: 
+    - name: POD_NAME  
+      valueFrom: 
+        fieldRef: 
+          fieldPath: metadata.name # 引用Pod的元数据字段，而不是设定一个具体的值
+    - name: POD_NAMESPACE   
+      valueFrom: 
+        fieldRef: 
+          fieldPath: metadata.namespace  
+	- name: POD_IP    
+	  valueFrom: 
+	    fieldRef: 
+	      fieldPath: status.podIP 
+	- name: NODE_NAME     
+	  valueFrom: 
+	    fieldRef: 
+	      fieldPath: spec.nodeName 
+    - name: SERVICE_ACCOUNT 
+      valueFrom: 
+        fieldRef: 
+          fieldPath: spec.serviceAccountName 
+    - name: CONTAINER_CPU_REQUEST_MILLICORES  
+      valueFrom: 
+        resourceFieldRef: 
+          resource: requests.cpu 
+          divisor: 1m 
+     - name: CONTAINER_MEMORY_LIMIT_KIBIBYTES
+     valueFrom: 
+	   resourceFieldRef: 
+         resource: limits.memory  
+         divisor: 1ki
+```
 
 
 
