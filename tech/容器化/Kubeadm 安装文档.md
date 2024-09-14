@@ -40,9 +40,9 @@ hostnamectl set-hostname k8sNode2
 vim /etc/hosts
 
 # for k8s-cluster
-192.168.5.5 k8sMaster
-192.168.5.3 k8sNode1
-192.168.5.4 k8sNode2
+192.168.5.5 k8smaster
+192.168.5.3 k8snode1
+192.168.5.4 k8snode2
 ```
 
 > 配置 yum 源
@@ -118,8 +118,8 @@ Master 节点免密钥登录其他节点。**只需要在 Master 节点操作**�
 ssh-keygen -t rsa -P "" -f ~/.ssh/id_rsa
 
 # 注意这需要其他节点允许root直接登录
-ssh-copy-id -i ~/.ssh/id_rsa.pub k8sNode1
-ssh-copy-id -i ~/.ssh/id_rsa.pub k8sNode2
+ssh-copy-id -i ~/.ssh/id_rsa.pub k8snode1
+ssh-copy-id -i ~/.ssh/id_rsa.pub k8snode2
 ```
 
 > 升级系统
@@ -320,7 +320,7 @@ localAPIEndpoint:
   bindPort: 6443
 nodeRegistration:
   criSocket: /var/run/dockershim.sock
-  name: k8s_master       # Master 节点名称
+  name: k8smaster       # Master 节点名称
   taints:
   - effect: NoSchedule
     key: node-role.kubernetes.io/master
@@ -413,7 +413,7 @@ https://projectcalico.docs.tigera.io/getting-started/kubernetes/requirements
 cd /root
 wget -o calico_v3.22.yaml https://docs.projectcalico.org/v3.22/manifests/calico.yaml --no-check-certificate
 vim calico.yaml
-# 去掉下列行注释，定义pod网段
+# 去掉下列行注释，定义pod网段（注意网段要和前面定义的一致）
             - name: CALICO_IPV4POOL_CIDR
               value: "172.16.0.0/16"
 # 安装
@@ -432,12 +432,12 @@ k8s需要安装metrics实现对自身一些基本指标如CPU和内存用量的�
 ```
 cd /root 
 
-wget -O metrics-server-components.yaml --no-check-certificate https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+wget -O metrics-server-components.yaml --no-check-certificate https://github.com/kubernetes-sigs/metrics-server/releases/download/v0.6.4/components.yaml
 
 
 sed -i 's#k8s.gcr.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g' metrics-server-components.yaml
 
-sed -i 's#registry.k8s.io#registry.cn-hangzhou.aliyuncs.com/google_containers#g' metrics-server-components.yaml
+sed -i 's#registry.k8s.io/metrics-server#registry.cn-hangzhou.aliyuncs.com/google_containers#g' metrics-server-components.yaml
 
 
 # 添加kubelet-insecure-tls
@@ -564,11 +564,13 @@ traefik   NodePort   192.168.109.23   <none> 9000:30176/TCP,80:31833/TCP,443:300
 `443:30037/TCP`：端口 30037 是 443 端口的 nodeport 入口，前端 nginx 或负载均匀器转发到 node ip 的这个端口上
 
 
-### 安装 ingress-nginx
+### 安装 Ingress-Controller
 
-Ingress-nginx 和 traefix 一样，均是作为网关得入口，两者可以选择其一。
+Ingress-Controller 和 traefix 一样，均是作为网关得入口，两者可以选择其一。
 
-k8s v.1.8 之前, ingress-nginx 安装版本为 0.x；k8s v.1.8+, ingress-nginx 安装版本为 1.x
+k8s v.1.8 之前, ingress-nginx 安装版本为 0.x；k8s v.1.8+, ingress-nginx 安装版本为 1.x。
+
+**ingress-Controller，ingress 控制器，本质是 Nginx，用来管理控制 ingress。匹配到 ingress 定义的规则，负责转发请求到对应的 service。**
 
 #### 0.x
 

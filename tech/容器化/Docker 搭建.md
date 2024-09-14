@@ -15,6 +15,8 @@
                   docker-engine
 ```
 
+如果找不到依赖卸载，可参考该文档：[Centos 7 彻底卸载清除 Docker 环境 - 知了小站 - IT人的小站](https://izlzl.com/archives/1278.html)
+
 - 添加 yum 源
 
 ```
@@ -31,6 +33,7 @@ yum-config-manager  --add-repo  http://mirrors.aliyun.com/docker-ce/linux/centos
 
 ```
 yum install -y docker-ce-20.10.* docker-ce-cli-20.10.* 
+
  
 # 配置cgroup和datadir，一般/data需要另外挂载data数据盘
 mkdir -p /etc/docker /data/docker
