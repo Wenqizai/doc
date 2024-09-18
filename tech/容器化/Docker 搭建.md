@@ -66,7 +66,17 @@ sudo systemctl restart docker
 systemctl daemon-reload && systemctl enable --now docker
 ```
 
+# Docker-Compose 
+
+```
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.29.2/docker-compose-$(uname -s)-$(uname -m)"  -o /usr/local/bin/docker-compose
+sudo mv /usr/local/bin/docker-compose /usr/bin/docker-compose
+sudo chmod +x /usr/bin/docker-compose     
+```
+
 # 搭建
+
+## registry 
 
 [搭建docker镜像仓库(一)：使用registry搭建本地镜像仓库 - 人生的哲理 - 博客园](https://www.cnblogs.com/renshengdezheli/p/16646969.html)
 
@@ -91,6 +101,66 @@ docker push 192.168.5.5:5000/kubia:v1.0
 # 查看私有仓库镜像
 curl -XGET http://ip:port/v2/_catalog
 curl -XGET http://ip:port/v2/<imageName>/tags/list
+```
+
+## harbor
+
+安装文档：
+
+[Linux中基于Docker搭建harbor私有镜像仓库（超级详细）\_Docker\_A-刘晨阳\_InfoQ写作社区](https://xie.infoq.cn/article/faa9ee456452891828cc080b8)
+
+harbor github：[GitHub - goharbor/harbor: An open source trusted cloud native registry project that stores, signs, and scans content.](https://github.com/goharbor/harbor) 
+
+- 下载安装包 
+
+```
+# 下载安装包，可手动下载离线包
+wget https://github.com/goharbor/harbor/releases/download/v2.4.2/harbor-offline-installer-v2.4.2.tgz
+
+tar -xvf harbor-offline-installer-v2.4.2.tgz
+```
+
+- 配置文件
+
+```
+# 进入目录安装 
+cd harbor
+cp -ar harbor.yml.tmpl harbor.yml
+vim harbor.yml
+
+===> 
+
+hostname: 192.168.5.5  # 这里配置的监听地址，也可以是域名
+
+port: 5000 # 这里配置监听端口
+ 
+data_volume: /data/harbor  # 配置数据仓库
+ 
+# 注释https，在13行开始
+
+```
+
+- 安装执行 
+
+```
+# Harbor安装环境预处理
+./prepare
+
+# 安装并启动Harbor
+./install.sh
+
+# 检查是否安装成功（应该是启动9个容器）要在harbor目录下操作，否则docker-compose会又问题；
+docker-compose ps
+```
+
+- 登录 
+
+```
+docker login 192.168.5.5：5000 
+
+docker tag 
+
+docker push 
 ```
 
 # 可视化
