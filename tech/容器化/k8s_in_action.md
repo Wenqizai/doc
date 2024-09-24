@@ -3367,12 +3367,13 @@ metadata:
   name: downward   
 spec:
   containers:
-  - image: 192.168.5.5:5000/busybox:1.36   
+  - image: 192.168.5.5:5000/library/busybox:1.36   
+    name: main 
     command: ["sleep", "9999999"] 
 	resources: 
 	  requests: 
 	    cpu: 15m 
-	    memory: 100ki 
+	    memory: 100Ki 
 	  limits: 
 	    cpu: 100m 
      	memory: 4Mi  
@@ -3399,14 +3400,14 @@ spec:
           fieldPath: spec.serviceAccountName 
     - name: CONTAINER_CPU_REQUEST_MILLICORES  
       valueFrom: 
-        resourceFieldRef: 
+        resourceFieldRef:  # cpu 和内存引用 resourceFieldRef 字段而不是 fieldRef 字段 
           resource: requests.cpu 
           divisor: 1m 
-     - name: CONTAINER_MEMORY_LIMIT_KIBIBYTES
-     valueFrom: 
-	   resourceFieldRef: 
-         resource: limits.memory  
-         divisor: 1ki
+    - name: CONTAINER_MEMORY_LIMIT_KIBIBYTES
+      valueFrom: 
+	    resourceFieldRef: 
+          resource: limits.memory  
+          divisor: 1Ki
 ```
 
 

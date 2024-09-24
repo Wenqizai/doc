@@ -156,7 +156,7 @@ docker-compose ps
 - 登录 
 
 ```
-docker login 192.168.5.5：5000 
+docker login 192.168.5.5:5000 
 
 docker tag 
 
