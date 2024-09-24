@@ -3376,7 +3376,7 @@ spec:
 	    memory: 100Ki 
 	  limits: 
 	    cpu: 100m 
-     	memory: 4Mi  
+     	memory: 7Mi  
     env: 
     - name: POD_NAME  
       valueFrom: 

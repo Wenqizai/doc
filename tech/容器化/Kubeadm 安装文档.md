@@ -416,6 +416,13 @@ vim calico.yaml
 # 去掉下列行注释，定义pod网段（注意网段要和前面定义的一致）
             - name: CALICO_IPV4POOL_CIDR
               value: "172.16.0.0/16"
+
+# 如果 calico-node 不能启动, 添加以下配置 (calico/node is not ready: BIRD is not ready: BGP not established with 192.168.5.3,192.168.5.4)
+# Specify interface
+- name: IP_AUTODETECTION_METHOD
+  value: "interface=ens33"
+
+
 # 安装
 kubectl apply -f calico.yaml
  
