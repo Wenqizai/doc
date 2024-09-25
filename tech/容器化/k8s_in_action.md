@@ -3412,10 +3412,75 @@ spec:
           divisor: 1Ki     # 这个就是引用 limits.memory 除以的基数
 ```
 
+### DownwardAPI 卷方式传递 
 
+该 Pod 可以将相关信息写入的挂在文件夹 /etc/downward，并可以通过卷来访问。
 
+```
+vim downward-api-volume.yaml 
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: downward-volume  
+  labels: 
+    foo: bar 
+  annotations: 
+    key1: value1 
+    key2: | 
+      multi 
+      line 
+      value 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/busybox:1.36   
+    name: main 
+    command: ["sleep", "9999999"] 
+	resources: 
+	  requests: 
+	    cpu: 15m 
+	    memory: 100Ki 
+	  limits: 
+	    cpu: 100m 
+     	memory: 6Mi  
+    volumeMounts: 
+    - name: downward 
+      mountPath: /etc/downward 	 # 挂在 Pod 文件夹
+  volumes: 
+  - name: downward 
+    downwardAPI:    	 # 定义 downwardAPI 卷
+      items: 
+      - path: "podName" 
+        fieldRef: 
+          fieldPath: metadata.name
+      - path: "podNamespace"
+        fieldRef: 
+          fieldPath: metadata.name
+      - path: "labels"
+        fieldRef: 
+          fieldPath: metadata.labels  # pod 标签值保存在 /etc/downward/labels 文件中
+      - path: "annotations"
+        fieldRef: 
+          fieldPath: metadata.annotations  
+      - path: "containerCpuRequestMilliCores"
+        resourceFieldRef: 
+          containerName: main 
+          resource: requests.cpu 
+          divisor: 1m  
+      - path: "containerMemoryLimitBytes"
+        resourceFieldRef: 
+          containerName: main 
+          resource: requests.memory 
+          divisor: 1 
+```
 
+> 两种资源方式的比较
+
+当 Pod 发生修改标签和注解时，卷方式可以更新相关的数据，而环境变量方式不能。
+
+<font color="#2DC26B">在实际生产中，并不会通过这两种方式来获取相关的资源信息。而是通过访问 Kubernetes API 服务器方式来获取。</font>
+
+## Kubernetes API 服务器 
 
 
 
