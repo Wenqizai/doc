@@ -163,6 +163,43 @@ docker tag
 docker push 
 ```
 
+- 配置开机启动文件
+
+```
+cat > /usr/lib/systemd/system/harbor.service <<EOF
+[Unit]
+Description=Harbor
+After=docker.service systemd-networkd.service systemd-resolved.service
+Requires=docker.service
+Documentation=http://github.com/vmware/harbor
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=5
+ExecStart=/usr/local/bin/docker-compose -f /usr/local/docker/harbor/harbor/docker-compose.yml up
+ExecStop=/usr/local/bin/docker-compose -f /usr/local/docker/harbor/harbor/docker-compose.yml down
+
+[Install]
+WantedBy=multi-user.target
+
+EOF
+```
+
+- 配置开机启动 
+
+```
+# 手动停止
+docker-compose -f /usr/local/docker/harbor/harbor/docker-compose.yml down
+
+# 加载配置和设置开机自启
+systemctl daemon-reload
+systemctl enable harbor.service
+
+# 启动Harbor
+systemctl start harbor.service
+```
+
 # 可视化
 
 ## Registry-browser
