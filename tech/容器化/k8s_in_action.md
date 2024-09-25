@@ -3358,6 +3358,8 @@ Downward API 可传递给 Pod 的数据包括以下：
 
 ### 环境变量方式传递
 
+该 Pod 可以设置相关 Pod 的环境变量。意味着 Pod 内的容器进程可以通过读取环境变量来获取相关信息。
+
 ```
 vim downward-api-env.yaml 
 
@@ -3407,8 +3409,10 @@ spec:
       valueFrom: 
 	    resourceFieldRef: 
           resource: limits.memory  
-          divisor: 1Ki
+          divisor: 1Ki     # 这个就是引用 limits.memory 除以的基数
 ```
+
+
 
 
 
