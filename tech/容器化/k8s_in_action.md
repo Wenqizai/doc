@@ -3478,13 +3478,21 @@ spec:
 
 当 Pod 发生修改标签和注解时，卷方式可以更新相关的数据，而环境变量方式不能。
 
-<font color="#2DC26B">在实际生产中，并不会通过这两种方式来获取相关的资源信息。而是通过访问 Kubernetes API 服务器方式来获取。</font>
+<font color="#2DC26B">在实际生产中，并不会通过这两种方式来获取相关的资源信息。Downward API 的两种方式都是只能获取单个 Pod 的资源信息。一般情况，我们时通过访问 Kubernetes API 服务器方式来获取。</font>
 
 ## Kubernetes API 服务器 
 
+我们不可以直接访问到 API 服务器，访问 API 服务器必须需要认证的 https 请求。以下验证相关测试：
 
+```
+# 获取 API 服务器地址 
+kubectl cluster-info 
 
+# 访问 API 服务器 
+curl https://192.168.5.5:6443 -k 
+```
 
+如果需要访问到 API 服务器，需要通过代理服务器与 API 服务器来交互。
 
 
 
