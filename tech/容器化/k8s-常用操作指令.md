@@ -337,6 +337,26 @@ kubectl create configmap <name> --from-file=<dirName>
 kubectl delete configmap <name>
 
 ```
+
+# DNS 
+
+```
+# Pod 
+kubectl get pods -n kube-system | grep dns 
+
+# configmap
+kubectl get configmap coredns -n kube-system -o yaml
+
+# svc 
+kubectl get svc -n kube-system | grep dns 
+
+# pod 内执行，测试 dns 解释 
+nslookup kubernetes.default.svc.cluster.local
+dig kubernetes.default.svc.cluster.local、
+
+# Pod 内执行
+cat /etc/resolv.conf
+```
 # 插件
 
 ## Krew 

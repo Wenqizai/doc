@@ -3492,18 +3492,66 @@ kubectl cluster-info
 curl https://192.168.5.5:6443 -k 
 ```
 
-如果需要访问到 API 服务器，需要通过代理服务器与 API 服务器来交互。
+如果需要访问到 API 服务器，需要通过代理服务器与 API 服务器来交互。通过 Proxy 服务器方式访问 API 服务器，我们无需每次请求都需要认证，而可以直接和真实的 API 服务器交互。
 
+**启动 Proxy，并访问**
 
+```
+# 本地启动的 kubectl, 已知晓与 API 服务器的认证方式
+kubectl proxy 
 
+# 验证，proxy 绑定了本地 IP
+curl 127.0.0.1:8001
+```
 
+我们亦可以通过 API 访问对应下的资源信息：
 
+```
+curl http://127.0.0.1:8001/apis/batch/v1
+```
 
+### Pod 访问 API 服务器
 
+我们在 Master 中可以通过 kubectl proxy 来完成 API Server 的访问。但是在 Pod 里面是没有 kubectl 的。如果 Pod 要与 API Server 进行交互，需要明确以下的事情：
 
+- API Server 的位置；
+- 确保 API Server 的真实性，而不是伪装者；
+- 通过 API Server 的认证访问。
 
+**准备 Pod**
 
+```
+vim curl-pod.yaml 
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl 
+spec: 
+  containers: 
+  - name: main 
+    image: 192.168.5.5:5000/library/alpine/curl:8.8.0
+    command: ["sleep", "9999999"]
+```
+
+**API Server 地址**
+
+```
+# 主机执行
+kubectl get svc
+
+# Pod 内环境变量获取
+env | grep KUBERNETES_SERVICE
+```
+
+同时我们每个服务都会配置 DNS，亦可以通过 DNS 访问：
+
+```
+# Pod 内执行, 访问 API Server 都需要凭证，为了安全建议开启，不忽略
+curl https://kubernetes 
+```
+
+**验证 API Server 身份**
 
 
 
