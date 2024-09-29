@@ -3553,9 +3553,27 @@ curl https://kubernetes
 
 **验证 API Server 身份**
 
+每个 Pod 在创建时，都会自动创建名为 `default-token-xzzv2` 的 Secret，并挂载到每个容器的 `/var/run/secrets/kubernetes.io/serviceaccount` 目录下。
 
+```
+kubectl get secrets 
 
+# Pod 内执行 
+ls /var/run/secrets/kubernetes.io/serviceaccount
+```
 
+目录下有 3 个文件：`ca.crt` 、`namespace`、` token `。
+
+- `ca.crt` ：CA 证书，用来对 Kubernetes API 服务器证书进行签名，用来验证 API Server 的证书是否由 CA 签发。
+
+```
+# 使用证书访问
+curl --cacert /var/run/secrets/kubernetes.io/serviceaccount/ca.crt https://kubernetes
+
+# 绑定环境变量，无需每次指定证书
+export CURL_CA_BUNDLE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+curl https://kubernetes
+```
 
 
 
