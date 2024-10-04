@@ -3695,6 +3695,16 @@ Python：[GitHub - kubernetes-client/python: Official Python client library for 
 
 Amdatu-Java： https://bitbucket.org/amdatulabs/amdatu-Kubernetes
 
+### Swagger UI 查看 API 信息
 
+API Server 是支持 Swagger 来可视化查询 API 相关信息的。正常我们可以通过浏览器打开以下链接：
 
+```
+http://<api server>:<port>/swagger-ui
+```
 
+但是要注意，API Server 需要认证授权信息，kubectl proxy 只绑定了 localhost 地址。这时我们需要将 swagger 相关端口和地址转发代理出去才能访问。
+
+**我们可以也暴露相关文档信息，但不能访问到 API Server**
+
+[Kubernetes: How to View Swagger UI · Jonny Langefeld](https://jonnylangefeld.com/blog/kubernetes-how-to-view-swagger-ui)
