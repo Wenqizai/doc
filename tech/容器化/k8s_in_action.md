@@ -3575,12 +3575,53 @@ export CURL_CA_BUNDLE=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 curl https://kubernetes
 ```
 
+**获得 API Server 的授权**
 
+我们获得授权之后，就可以对集群中的对象进行操作，包括读取和修改。我们认证的凭证，同样可以使用 `default-token Secret` ，凭证就存储在 secret 卷的 token 文件中。
 
+1. 挂载凭证 token 到环境变量 
 
+```
+TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+```
 
+2. 使用凭证获取 API Server 授权
 
+API Server 的响应理论上与 Kubectl Proxy 响应一致。但是此时 Pod 的 SeviceAccount 是 default，不能访问根路径下 `/` 的所有资源，因此可以访问 `/api` 来验证效果。
 
+```
+curl -H "Authorization: Bearer $TOKEN" https://kubernetes
+```
+
+**关闭基于角色的访问控制（RBAC）**
+
+我们现在的集群是基于 RBAC 的，default ServiceAccount 只会拥有部分的资源权限。我们可以通过将 admin 的权限来绑定所有 ServiceAccount 来让 default ServiceAccount 拥有完全的权限。
+
+<font color="#e36c09">注意：此操作是危险的，任何时候不能在生产的集群中操作，正常操作是授予指定 ServiceAccount 的完整权限，Pod 绑定该 ServiceAccount。</font>
+
+以下命令是赋予所有的 ServiceAccount Admin 权限。
+
+```
+kubectl create clusterrolebinding permissive-binding \
+--clusterrole=cluster-admin \
+--group=system:serviceaccounts 
+```
+
+**获取当前运行 Pod 的命名空间**
+
+当我们要访问 Pod 的相关信息时，需要指定命名空间。命名空间的获取我们可以通过 downwardAPI 设置环境变量或卷方式获取。也可以通过 `default-token Secret` 在指定文件下获取。
+
+获取到 NameSpace 之后，可以向 API Server 执行相对应的 Pod 访问操作。
+
+```
+ NS=$(cat /var/run/secrets/kubernetes.io/serviceaccount/namespace)
+ curl -H "Authorization: Bearer $TOKEN" https://kubernetes/api/v1/namespaces/$NS/pods
+```
+
+Pod 访问 API Server 基本上时通过 `default-token Secret` 挂载的三个文件来完成认证、授权、定位的过程。
+
+⚠️upload failed, check dev console
+![[Pod访问APIServer的方式.png]]
 
 
 
