@@ -267,3 +267,15 @@ registry garbage-collect /etc/docker/registry/config.yml
 du  -chs  /var/lib/registry/ 
 
 ```
+
+# 镜像拉取策略
+
+当镜像的 tag 为 lastest 时（显式指定或不指定），imgaePullPolicy 属性默认为 Always。
+
+当镜像的 tag 为指定时，即非 lastest 时，imgaePullPolicy 属性默认为 ifNotPresent。意味者本地有镜像时，docker 不会去远程拉取镜像。
+
+如果我们修改了一个 tag 非 lastest 的镜像时，需要设置对应的 imgaePullPolicy 为 Always，docker 才会去拉去最新镜像，否则构建的还是本地的旧镜像。
+
+良好的开发习惯是修改镜像后，需要更改 tag。
+
+

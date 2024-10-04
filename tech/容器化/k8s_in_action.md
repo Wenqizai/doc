@@ -3708,3 +3708,131 @@ http://<api server>:<port>/swagger-ui
 **我们可以也暴露相关文档信息，但不能访问到 API Server**
 
 [Kubernetes: How to View Swagger UI · Jonny Langefeld](https://jonnylangefeld.com/blog/kubernetes-how-to-view-swagger-ui)
+
+# Deployment 
+
+**回顾 ReplicationController 和 ReplicaSet：**
+
+ReplicationController 是用来管理 Pod 的副本数量，但某一 Pod 不可用时，ReplicationController 会自动创建新的 Pod 来满足指定的副本数量。
+
+ReplicaSet 的行为与 ReplicationController 一致，并提供功能更丰富的标签选择器。ReplicaSet 完全是用来代替 ReplicationController 的。
+
+Deployment，基于 ReplicaSet 的一种高级实现。支持对 Pod 的升级、回滚等操作，并实现零停机操作的过程。
+
+## 手动更新应用
+
+在 ReplicationController 和 ReplicaSet 管理的 Pod 可以自动创建指定副本数量的 Pod。那么我们可以执行应用升级可以有两种方式：
+
+- 方式一：删除所有的 Pod，自动创建新的 Pod；
+- 方式二：创建新的 Pod，删除旧的 Pod。可以逐一创建逐一删除或一次性创建和一次性删除。
+
+方式一，造成一定时间范围内，服务不可用；
+方式二，造成一定时间范围内，集群存在两个版本的应用，同时也会占用一部分额外的资源（需要评估应用是否运行两个版本同时运行）。
+
+### 删除 Pod，后创建 Pod 
+
+通过修改 ReplicationController Pod 模板版本，然后删除旧 Pod，ReplicationController 会自动检测到当前没有 Pod 匹配它的标签选择器，便会自动创建新的实例。
+
+**注意：ReplicationController 的同步刷新周期是 10s**
+
+此方式，需要忍受集群内一段时间服务不可用。
+
+⚠️upload failed, check dev console
+![[升级-删除后创建Pod.png|700]]
+
+### 创建 Pod，后删除 Pod
+
+> 旧版本立马切换到新版本
+
+**蓝绿部署：** 先创建 v2 版本的 Pod，等待创建完成之后，修改 service 的标签选择器，将流量切换到新的 Pod。切换流量之后，确认功能运行正常，删除旧 Pod。
+
+此方式，集群中需要 2 倍的资源量。
+
+⚠️upload failed, check dev console
+![[升级-创建后删除Pod.png]]
+
+> 执行滚动升级
+
+逐一创建，逐一替代原有的 Pod，此方式需要容忍一段时间内集群有有两个版本应用。
+
+⚠️upload failed, check dev console
+![[升级-逐一创建逐一删除Pod.png]]
+
+## 自动滚动升级 
+
+手动升级的过程基本上是通过修改 ReplicationController 和 Service 的标签选择器来完成整个升级的过程。而我们也可以借助 kubectl 命令来完成以上手动的过程。
+
+注：这种升级方式相对与 Deployment 来说也过时的。
+
+**准备 Pod**
+
+```
+vim kubia-rc-svc-v1.yaml 
+
+apiVersion: v1
+kind: ReplicationController 
+metadata:
+  name: kubia-v1   
+spec: 
+  replicas: 3
+  template: 
+    metadata: 
+      name: kubia 
+      labels: 
+        app: kubia 
+    spec: 
+      containers: 
+  		- name: nodejs 
+    	  image: 192.168.5.5:5000/library/luksa/kubia:v1 
+---
+apiVersion: v1
+kind: Service  
+metadata:
+  name: kubia
+spec: 
+  type: LoadBalancer 
+  selector: 
+    app: kubia 
+  ports: 
+  - port: 80 
+    targetPort: 8080
+```
+
+**访问 pod**
+
+```
+kubectl get svc | grep kubia 
+curl http://<svc-ip>
+```
+
+**kubectl 执行滚动升级**
+
+执行该命令时，kubectl 会将 v1 的 rc 副本数慢慢减少至 0，而 v2 的 rc 将会逐渐增加到指定的副本数量。
+
+```
+kubectl rolling-update kubia-v1 kubia-v2 --image=192.168.5.5:5000/library/luksa/kubia:v2
+```
+
+**注意：** 此命令已经被废弃。因为网络是不能保证稳定的，当网络不稳定时，升级将会中断。此时的 Pod 和 RC 都处于中间状态，显然是不能接受的。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
