@@ -3623,10 +3623,61 @@ Pod 访问 API Server 基本上时通过 `default-token Secret` 挂载的三个�
 ⚠️upload failed, check dev console
 ![[Pod访问APIServer的方式.png]]
 
+### Ambassador 容器 
 
+上面讲述了 Pod 访问 API Server 的方式，基本过程是：HTTPs 认证、CA 证书认证和 token 授权等过程。对于开发者来说，更希望这个过程能够简化和屏蔽，专注于认证后的操作流程。
 
+Ambassador，中文含义大使、使节的意思，见名知义就是充当中间人的意思。
 
+我们知道 `kubectl proxy` 启动的代理服务器可以完成与 API Server 认证授权的过程。我们就可以启动一个 Ambassador 容器，并执行启动的代理服务器，我们的 Pod 就可以间接地与 API Server 进行交互。
 
+⚠️upload failed, check dev console
+![[Ambassador容器角色.png]]
 
+因为这个 ambassador 容器是在同一个 Pod 内，Pod 内共享资源。Pod 内其他容器就可以通过本地的端口来访问 ambassador 容器。
 
+**准备 admbassador 容器**
+
+Ambassador 容器负责运行 `kubectl-proxy` 镜像。
+
+```
+vim curl-with-ambassador.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-with-ambassador  
+spec: 
+  containers: 
+  - name: main 
+    image: 192.168.5.5:5000/library/alpine/curl:8.8.0
+    command: ["sleep", "9999999"]
+  - name: ambassador 
+    image: 192.168.5.5:5000/library/luksa/kubectl-proxy:1.6.2  
+```
+
+进入 main 容器 
+
+```
+kubectl exec -it curl-with-ambassador -c main -- bash 
+```
+
+**ambassador 与 API Server 交互**
+
+默认情况，`kubectl proxy` 绑定的是 8001 端口，我们就可以进入 ambassador 镜像执行并访问 API Server。
+
+同样进入 main 容器执行以下，亦可以获取到 API Server 的响应。
+
+```
+curl 127.0.0.1:8001/api
+```
+
+目前为止，我们已经完成 Pod 内通过 Ambassador 容器与 API Server 的交互。我们可以向 Ambassador 容器发送普通的 HTTP 请求，然后由 Ambassador 容器完成与 API Server 一系列的认证和授权过程。
+
+**Note：**
+
+Ambassador 容器可以独立部署，像注册中心一样，像多个 Pod 多个应用提供服务。缺点就是需要独立维护、运行额外的进程，消耗一定的资源。
+
+⚠️upload failed, check dev console
+![[容器-ambassador-apiserver交互过程.png]]
 
