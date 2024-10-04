@@ -3681,3 +3681,20 @@ Ambassador 容器可以独立部署，像注册中心一样，像多个 Pod 多�
 ⚠️upload failed, check dev console
 ![[容器-ambassador-apiserver交互过程.png]]
 
+### 客户端库访问 API Server 
+
+> 官方支持
+
+Golang client ：[GitHub - kubernetes/client-go: Go client for Kubernetes.](https://github.com/kubernetes/client-go)
+
+Python：[GitHub - kubernetes-client/python: Official Python client library for kubernetes](https://github.com/kubernetes-incubator/client-python)
+
+> 社区维护
+
+ Fabric8io-Java： https://github.com/fabric8io/kubernetes-Client
+
+Amdatu-Java： https://bitbucket.org/amdatulabs/amdatu-Kubernetes
+
+
+
+
