@@ -3815,6 +3815,103 @@ kubectl rolling-update kubia-v1 kubia-v2 --image=192.168.5.5:5000/library/luksa/
 
 **注意：** 此命令已经被废弃。因为网络是不能保证稳定的，当网络不稳定时，升级将会中断。此时的 Pod 和 RC 都处于中间状态，显然是不能接受的。
 
+## Deployment 声明式升级
+
+当使用 RC 和 RS 时，我们都需要手动去执行相关的升级。而 Deployment 管理的 RS 可以帮我们省去大部分繁琐的操作。
+
+⚠️upload failed, check dev console
+![[deployment与rs的关系.png]]
+
+**创建 Deployment**
+
+Deployment 的名称中不需要像 rc 和 rs 带上版本号，Deployment 会自动生成版本号，同时也可以管理多个版本的应用。
+
+```
+vim kubia-deployment-v1.yaml 
+
+apiVersion: apps/v1
+kind: Deployment  
+metadata:
+  name: kubia   
+spec: 
+  replicas: 3
+  selector:
+    matchLabels:
+      app: kubia
+  template: 
+    metadata: 
+      name: kubia 
+      labels: 
+        app: kubia 
+    spec: 
+      containers: 
+  		- name: nodejs 
+    	  image: 192.168.5.5:5000/library/luksa/kubia:v1 
+
+```
+
+### Deployment 升级策略
+
+**RollingUpdate**
+
+默认升级策略，执行滚动更新。渐进地删除旧的 Pod，同时创建新的 Pod，保证升级期间的服务可用。
+
+**Recreate**
+
+一次性删除所有旧版本的 Pod，然后创建新的 Pod。
+
+**减缓滚动升级速度**
+
+kubectl patch 直接生效，免去 kubectl edit 的繁琐。此操作是改变 deployment 自有属性，没有修改到 Pod 模板时，并不会触发 Pod 更新。
+
+```
+kubectl patch deployment kubia -p '{"spec":{"minReadySeconds":10}}'
+```
+
+**触发更新**
+
+```
+kubectl set image deployment kubia nodejs=192.168.5.5:5000/library/luksa/kubia:v2
+```
+
+### Deployment 好处
+
+Kubernetes 接管了整个升级的过程，让升级变得简单可靠，开发者只需关注升级后的状态，其他交给 Kubernetes 来管理。
+
+Deployment 升级的背后其实就是与执行 `kubectl rolling-update` 命令非常相似。创建一个新的 ReplicaSet，然后慢慢扩容。同时将之前版本的 ReplicaSet 慢慢缩容至 0。
+
+⚠️upload failed, check dev console
+![[deployment滚动升级.png]]
+
+Deployment 会保留旧的 ReplicaSet，不会直接删除。同时这些 ReplicaSet 的创建和删除都是由 Deployment 来管理。对外提供滚动升级和回滚的功能。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

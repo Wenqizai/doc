@@ -225,6 +225,46 @@ kubetail -l <labelKey>=<labelValue> -n <namespace>
 # 查询 deploy 所有 pod 日志, 取 10 分钟内最后 10 条
 kubetail <deployName> -n <namespace> --since 10m --tail 10
 ```
+
+# 修改资源方式
+
+## kubectl edit 
+
+使用默认编辑器打开资源配置。修改保存之后，资源对象会被更新。
+
+```
+kubectl edit deployment kubia
+```
+## kubectl patch 
+
+修改单个资源属性。
+
+```
+kubectl patch deployment kubia -p '{"spec":{"template":{"spec":{"containers":[{"name":"nodejs","image":"luksa/kubia:v2"}]}}}}'
+```
+## kubectl apply 
+
+通过一个完整的 YAML 或 JSON 文件，应用其中新的值来修改对象。如果对象不存在，则被创建。文件需要包含资源完整的定义，而不是像 kubectl patch 只更新某些字段属性。
+
+```
+kubectl apply -f kubia-deployment-v2.yaml 
+```
+## kubectl replace 
+
+将原有对象替换成 YAML/JSON 文件中定义的新对象。此命令要求对象必须存在，否则报错。
+
+```
+kubectl replace -f kubia-deployment-v2.yaml
+```
+
+## kubectl setimage 
+
+修改 Pod、ReplicationController、Deployment、DemonSet、Job 或 ReplicaSet 内镜像。
+
+```
+kubectl set image deployment kubia nodejs=luksa/kubia:v2
+```
+
 # DaemonSet
 
 指令可参考 rc、rs。
@@ -263,6 +303,13 @@ kubectl delete rc kubia --cascade=false
 kubectl delete rc kubia
 ```
 
+# Deployment 
+
+```
+# 查看滚动升级的状态
+kubectl rollout status deployment <deploy-name>
+
+```
 # Explain 
 
 ```
