@@ -3885,10 +3885,41 @@ Deployment 升级的背后其实就是与执行 `kubectl rolling-update` 命令�
 
 Deployment 会保留旧的 ReplicaSet，不会直接删除。同时这些 ReplicaSet 的创建和删除都是由 Deployment 来管理。对外提供滚动升级和回滚的功能。
 
+### Deployment 回滚
 
+**部署有问题镜像 v3**
 
+```
+kubectl set image deployment kubia nodejs=192.168.5.5:5000/library/luksa/kubia:v3
 
+kubectl rollout status deployment kubia 
+```
 
+**回滚**
+
+```
+# 执行回滚
+kubectl rollout undo deployment kubia 
+```
+
+**查看历史版本**
+
+```
+kubectl rollout history deployment kubia
+```
+
+**回滚到特定版本**
+
+```
+kubectl rollout undo deployment kubia --to-revision=1 
+```
+
+**限定 RS 版本数量**
+
+RS 版本数量默认是 2，亦可以通过属性设置：`revisionHistoryLimit`。
+
+⚠️upload failed, check dev console
+![[Deployment维护多版本RS.png]]
 
 
 
