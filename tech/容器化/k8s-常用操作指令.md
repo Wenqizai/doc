@@ -309,6 +309,20 @@ kubectl delete rc kubia
 # 查看滚动升级的状态
 kubectl rollout status deployment <deploy-name>
 
+# 查看升级的历史版本
+kubectl rollout history deployment <deploy-name> 
+
+# 回滚升级
+kubectl rollout undo deployment <deploy-name> 
+
+# 回顾升级到特定版本
+kubectl rollout undo deployment <deploy-name> --to-revision=1 
+
+# 暂停升级 
+kubectl rollout pause deployment kubia 
+
+# 恢复升级 
+kubectl rollout resume deployment kubia 
 ```
 # Explain 
 

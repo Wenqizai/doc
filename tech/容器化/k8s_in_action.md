@@ -3921,34 +3921,139 @@ RS 版本数量默认是 2，亦可以通过属性设置：`revisionHistoryLimit
 ⚠️upload failed, check dev console
 ![[Deployment维护多版本RS.png]]
 
+### 控制升级
+
+#### 升级速率
+
+Deployment 默认采用滚动升级，一个 Pod 创建完，一个 Pod 被删除。此时删除和创建的数量是可以通过属性指定的。
+
+- maxSurge
+- maxUnavailable
+
+```
+spec: 
+  strategy: 
+    rollingUpdate: 
+      maxSurge: 1 
+      maxUnavailable: 0 
+    type: RollingUpdate 
+```
+
+- maxSurge 和 maxUnavailable 属性解释
+⚠️upload failed, check dev console
+![[Deployment升级速率属性.png]]
+
+- maxSurge = 1 和 maxUnavailable = 0
+⚠️upload failed, check dev console
+![[Deployment升级过程控制.png]]
+
+- maxSurge = 1 和 maxUnavailable = 1
+⚠️upload failed, check dev console
+![[Deployment升级过程控制2.png]]
+
+#### 暂停升级
+
+当 v4 版本镜像修复了 v3 版本问题，需要执行升级。但是不希望马上使用所有的 v4 进行替换，而是保留现有 v2 版本镜像之外运行 v4，以便升级之前验证 v4 时候符合要求后，再执行全面更新。
+
+一个新 Pod 被创建，旧 Pod 保留还在运行。
+
+```
+kubectl set image deployment kubia nodejs=192.168.5.5:5000/library/luksa/kubia:v4
+
+kubectl rollout pause deployment kubia 
+```
+
+金丝雀发布：少部分用户是新版本，大部分用户维持旧版本，验证通过后，全量更新。
+
+**恢复滚动升级**
+
+```
+kubectl rollout resume deployment kubia 
+```
+
+**暂停时机**
+
+目前没办法做到，指定滚动升级的某一个阶段暂停。所以采用这种方式的金丝雀发布是无法控制 Pod 的数量。正确的金丝雀发布应该是采用不同的 Deployment。
+
+暂时升级的好处是，可以多次修改 Deployment，直至恢复后生效。
+
+#### 阻止升级
+
+minReadySeconds 属性，指定新创建的 Pod 至少要成功运行多久之后，才能视为可用。在 Pod 可用之前，滚动升级的过程不会继续。
+
+该属性不单单可以减慢部署的速度，还可以用来避免部署出错版本的应用。
+
+**minReadySeconds 与 ReadinessProbe 配合，滚动升级更具节奏感**
+
+如果一个新的 Pod 运行出错，就绪指针 ReadinessProbe 返回失败，此时 Pod 处于 minReadySeconds 时间内，那么新版本的滚动升级将会被阻止。通常情况 minReadySeconds 要比 ReadinessProbe 设置的时间要大。
+
+**设置就绪指针 Deployment**
+
+每 1s 发送就绪指针探测，由于容器在第 5 次请求后返回失败，被 svc 摘取了流量，故 `minReadySeconds=10` 内暂停了滚动升级。
+
+```
+vim kubia-deployment-v3with-readinesscheck.yaml 
+
+apiVersion: apps/v1
+kind: Deployment  
+metadata:
+  name: kubia   
+spec: 
+  replicas: 3 
+  minReadySeconds: 10 
+  strategy: 
+    rollingUpdate: 
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: kubia
+  template: 
+    metadata: 
+      labels: 
+        app: kubia 
+    spec: 
+      containers: 
+  		- name: nodejs 
+    	  image: 192.168.5.5:5000/library/luksa/kubia:v3 
+          readinessProbe: 
+            periodSeconds: 1
+            httpGet: 
+              path: /
+              port: 8080 
+```
+
+- 查看滚动升级状态
+
+```
+kubectl rollout status deployment kubia
+```
 
 
+⚠️upload failed, check dev console
+![[ReadinessProbe失败终止Deployment滚动升级.png]]
 
+#### 升级的 Deadline
 
+当我们滚动升级被暂停了，那么我们的升级流程就会一直被卡在那里么？
 
+答案当然不是，默认情况下，滚动升级的 deadline 是 10 分钟。如果 10 分钟不能完成升级，那么该次升级被认为是失败。
 
+**查看/设定 deadline**
 
+Deadline 由该属性指定：`spec.progressDeadlineSeconds`
 
+```
+kubectl describe deploy kubia 
+```
 
+#### 取消升级
 
+当滚动升级时间达到 progressDeadlineSeconds，或执行以下命令时，滚动升级过程都会自动取消。
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
+kubectl rollout undo deployment kubia
+```
 
 
 
