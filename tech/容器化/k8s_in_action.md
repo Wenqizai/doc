@@ -4055,11 +4055,58 @@ kubectl describe deploy kubia
 kubectl rollout undo deployment kubia
 ```
 
+# StatefulSet 
 
+目前我们学习的都是无状态多副本的 Pod，Pod 可以被调度到不同的节点，Pod 可以被重启。
 
+StatefulSet 有状态多副本应用，每个 Pod 都有独立的状态，独立的存储，应用于数据库、消息队列等分布式存储系统。那么 StatefulSet 同样也是需要面对和解决分布式系统的难点。
 
+**关于分布式存储系统难点**
 
+1. 数据一致性，强一致还是最终一致性，CAP 的取舍；
+2. 容错与容灾；
+3. 负载均衡，动态扩缩容的要求；
+4. 数据一致性与性能的平衡；
+5. 数据分片；
+6. 分布式事务管理。
 
+## 复制有状态 Pod 
+
+**回顾：** 复制无状态的 Pod，通过 ReplicaSet 的 Pod 模板和调整目标副本数量就可以实现。值得注意是，如果 Pod 模板中绑定了 PVC，那么所有的 Pod 都会绑定到同一个 PVC 中，并不是每个 Pod 独立绑定或指定 PVC。
+
+⚠️upload failed, check dev console
+![[ReplicaSet中的Pod共享同一个PVC.png]]
+
+**运行独立存储的多副本**
+
+如何创建独立存储的多副本？
+
+- 手动创建 Pod，独立绑定 PVC ？（not a good idea）
+
+- 一个 ReplicaSet，一个 Pod？（如何解决扩缩容问题？再次创建删除 RS？显然也不现实）
+
+- 共享 PVC，使用不同的 PV 目录。(这种方式是不能在 Pod 模板中指定不同的目录，但是可以指定让实例自动选择/创建一个别的实例还没有使用的数据目录。这种方式，要求实例之间要互相协调，保证正确性，共享存储也是一个性能瓶颈点。)
+
+⚠️upload failed, check dev console
+![[Pod相同PVC，不同的PV目录.png]]
+
+**多副本的标识**
+
+一个有状态的 Pod，必须带上唯一标识。当一个 Pod 被替换、重启后，拥有全新的主机名、IP、网络标识。因此，必须带上该标识来查询并沿用旧实例的数据，避免出现问题。
+
+在分布式系统中注册、调度、心跳、事务管理等，网络标识尤为重要。那么如何确定这个网络标识呢？
+
+>架构：每个 Pod 实例配置单独 Service
+
+一个 ReplicaSet 一个 Pod，保证独立存储；
+一个 Pod，一个 Service，保证网络标识。
+
+**注意：** 该方案有严重缺陷，首先一个 ReplicaSet 一个 Pod，还是面临扩缩容问题。一个 Pod，一个 Service，Pod 是无法知道对应 service 的 IP 的，只能通过 DNS 去获取 IP，因此这种方案也是无法通过注册 SVC 的 IP 的。
+
+⚠️upload failed, check dev console
+![[一个Pod一个Service架构.png]]
+
+综上，有状态多副本面临独立存储、网络标识等问题，k8s 给出的解决方案 StatefulSet。
 
 
 
