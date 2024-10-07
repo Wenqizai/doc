@@ -4177,3 +4177,205 @@ StatefulSet 增加副本时，新的 PVC 和 PV 被创建，绑定在新的 Pod�
 At-Most-One 语义：
 1. 相同标识的 Pod 不会同时运行；
 2. 不同的 Pod 不会同时绑定相同的 PVC。
+
+## 部署 StatefulSet 
+
+- 准备镜像  
+
+```
+192.168.5.5:5000/library/luksa/kubia-pet:latest
+```
+
+- 创建持久卷 
+
+创建三个 pv，pv-a、pv-b、pv-c。
+
+这里是 List 的另外一种使用方式，就是定义 `kind: List`，如添加 `---` 一样。
+
+```
+vim  persistent-volumes.yaml 
+
+kind: PersistentVolumeList  
+apiVersion: v1 
+items: 
+- apiVersion: v1 
+  kind: PersistentVolume 
+  metadata:
+    name: pv-a  
+  spec:
+    capacity:
+      storage: 1Mi 
+    accessModes: 
+    - ReadWriteOnce 
+    persistentVolumeReclaimPolicy: Recycle  
+    nfs: 
+      server: 192.168.5.5
+      path: /public/k8s/statefulset/pv-a 
+- apiVersion: v1 
+  kind: PersistentVolume 
+  metadata:
+    name: pv-b   
+  spec:
+    capacity:
+      storage: 1Mi 
+    accessModes: 
+    - ReadWriteOnce 
+    persistentVolumeReclaimPolicy: Recycle  
+    nfs: 
+      server: 192.168.5.5
+      path: /public/k8s/statefulset/pv-b 
+- apiVersion: v1 
+  kind: PersistentVolume 
+  metadata:
+    name: pv-c   
+  spec:
+    capacity:
+      storage: 1Mi 
+    accessModes: 
+    - ReadWriteOnce 
+    persistentVolumeReclaimPolicy: Recycle  
+    nfs: 
+      server: 192.168.5.5
+      path: /public/k8s/statefulset/pv-c 
+```
+
+- 创建 Headless Service 
+
+```
+vim kubia-serviceheadless.yaml 
+
+apiVersion: v1
+kind: Service 
+metadata:
+  name: kubia 
+spec:
+  clusterIP: None 
+  ports: 
+  - port: 80 
+    name: http 
+  selector:
+    app: kubia
+```
+
+- 创建 StatefulSet 
+
+```
+vim kubia-statefulset.yaml 
+
+apiVersion: apps/v1
+kind: StatefulSet  
+metadata:
+  name: kubia 
+spec:
+  serviceName: kubia 
+  replicas: 2
+  selector: 
+    matchLabels:
+      app: kubia 
+  template: 
+    metadata: 
+      labels: 
+        app: kubia 
+    spec: 
+      containers: 
+      - name: kubia 
+        image: 192.168.5.5:5000/library/luksa/kubia-pet:latest 
+        ports:  
+        - name: http 
+          containerPort: 8080 
+        volumeMounts: 
+        - name: data 
+          mountPath: /var/data 
+  volumeClaimTemplates: 
+  - metadata: 
+      name: data 
+    spec: 
+      resources: 
+        requests: 
+          storage: 1Mi 
+      accessModes: 
+      - ReadWriteOnce 
+```
+
+**访问 Pod**
+
+我们部署的 service 是 headless 模式，是不能通过它来访问我们的 Pod。如果需要指定 Pod 访问，我们也不能通过创建一个新的 service 来访问 Pod，因为 service 访问 Pod 是随机的。
+
+> 通过 API 服务器与 Pod 通信 
+
+API 服务器可以通过代理直接连接到指定的 Pod。
+
+```
+<apiServerHost>:<port>/api/v1/namespaces/default/pods/kubia-0/proxy/<path>
+```
+
+但是需要注意的是，访问 API 服务器需要鉴权。为了方便可以通过 `kubectl proxy`。
+
+- 测试 
+
+```
+curl 127.0.0.1:8001/api/v1/namespaces/default/pods/kubia-0/proxy/
+
+# 存储数据
+curl -X POST -d "Hey there! This greeting was submitted to kubia-0." 127.0.0.1:8001/api/v1/namespaces/default/pods/kubia-0/proxy/
+
+# 获取数据
+curl 127.0.0.1:8001/api/v1/namespaces/default/pods/kubia-0/proxy/
+
+# 测试其他节点，没有数据存储
+curl 127.0.0.1:8001/api/v1/namespaces/default/pods/kubia-1/proxy/
+```
+
+⚠️upload failed, check dev console
+![[通过APIServer访问Pod.png]]
+
+**删除有状态的 Pod**
+
+删除了一个有状态的 Pod 之后，StatefulSet 会马上创建一个相同名称的新 Pod，kubia-0。新 Pod 可以调度到任意节点，但是旧 Pod 的状态也会转移到新 Pod 上。
+
+```
+kubectl delete po kubia-0
+```
+
+⚠️upload failed, check dev console
+![[StatefulSet删除Pod.png]]
+
+**扩缩容 StatefulSet**
+
+扩缩容都是逐步进行的，从最高索引值开始操作，不会删除绑定的 PVC。
+
+**暴露 Pod 的 service**
+
+我能不能直接通过 headless service 访问 Pod，不通过 API Server 也不能直接访问 Pod。我们可以将一个集群的 service 来访问 Pod。
+
+它不是外部暴露的 Service （ 它是⼀ 个常规的 ClusterIP Service，不是⼀个 NodePort 或 LoadBalancer-type Service），只能在你的集群内部访问它。
+
+```
+vim kubia-servicepublic.yaml 
+
+apiVersion: v1
+kind: Service  
+metadata:
+  name: kubia-public
+spec: 
+  selector: 
+    app: kubia 
+  ports: 
+  - port: 80 
+    targetPort: 8080 
+```
+
+没有向外部暴露 service，同样可以通过 API Server 来访问到对应的 service。
+
+```
+<apiServerHost>:<port>/api/v1/namespaces/default/services/<service-name>/proxy/<path>
+```
+
+
+- 测试 
+
+通过 API Server 访问 service，随机访问 Pod。
+
+```
+curl 127.0.0.1:8001/api/v1/namespaces/default/services/kubia-public/proxy/
+```
