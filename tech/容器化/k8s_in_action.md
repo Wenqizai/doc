@@ -4070,7 +4070,7 @@ StatefulSet 有状态多副本应用，每个 Pod 都有独立的状态，独立
 5. 数据分片；
 6. 分布式事务管理。
 
-## 复制有状态 Pod 
+## 如何复制有状态 Pod 
 
 **回顾：** 复制无状态的 Pod，通过 ReplicaSet 的 Pod 模板和调整目标副本数量就可以实现。值得注意是，如果 Pod 模板中绑定了 PVC，那么所有的 Pod 都会绑定到同一个 PVC 中，并不是每个 Pod 独立绑定或指定 PVC。
 
@@ -4108,11 +4108,72 @@ StatefulSet 有状态多副本应用，每个 Pod 都有独立的状态，独立
 
 综上，有状态多副本面临独立存储、网络标识等问题，k8s 给出的解决方案 StatefulSet。
 
+## StatefulSet 简介
 
+StatefulSet 就是用来解决 RS 在独立存储，唯一标识等难题的资源。
 
+| ReplicaSet                   | StatefulSet                              |
+| ---------------------------- | ---------------------------------------- |
+| 无状态，每个 Pod 共享 PV，重启后是全新的 Pod | 有状态, 每个 Pod 独立 PV，重启后需要维持原有的实例名称、网络标识和状态 |
 
+### 稳定的标识
 
+StatefulSet 创建的 Pod，每个都是从 0 开始的顺序索引，体现在 Pod 的名称、主机名、固定存储上。
 
+⚠️upload failed, check dev console
+![[StatefulSet规则的Pod名称.png]]
 
+### 服务发现
 
+StatefulSet 通过创建一个 Headless Service，让 Pod 可以通过域名查询到其他 Pod 的 IP。
 
+比如，Headless Service 的名称是 foo，命名空间是 default。通过以下操作可以获取到其他 Pod 的 IP。
+
+```
+# 获取到 Pod 名称是 A-0 的 Pod IP
+a-0.foo.default.svc.cluster.local 
+
+# 获取到 foo svc 关联所有 Pod 的 IP
+foo.default.svc.cluster.local 
+```
+
+### 被重新调度的 Pod
+
+StatefulSet 创建的 Pod，被重启或重新调度之后，Pod 还是拥有原有的标识名称。
+
+⚠️upload failed, check dev console
+![[StatefulSet的Pod被重新调度.png]]
+
+### 扩缩容
+
+StatefulSet 的扩缩容都是从索引值最高的 Pod 进行操作（RS 是随机的）。
+
+注意点：
+
+1. StatefulSet 的缩容一次只能操作一个 Pod 实例，因为<font color="#e36c09">分布式存储中，数据可能是多副本的，当某一实例下线时可能会涉及数据的复制和迁移</font>，同时下线多个节点可能会导致副本同时下线，出现数据丢失的情况。因为如此，实例下线也不是一个快速的操作。
+2. StatefulSet 在有实例不健康的情况下，不允许做缩容。避免下线健康实例后，导致集群不可用。
+
+⚠️upload failed, check dev console
+![[StatefulSet缩容.png]]
+
+### 独立存储 
+
+StatefulSet 可以拥有一个或多个 PVC 模板，并利用 PV 的动态创建机制来绑定到不同的 PV。这样每个 Pod 都有独立的 PVC 和 PV。
+
+⚠️upload failed, check dev console
+![[StatefulSet创建的PVC.png]]
+
+**PV 的创建与删除**
+
+StatefulSet 增加副本时，新的 PVC 和 PV 被创建，绑定在新的 Pod。如果时缩容呢？我们知道当一个 PVC 被删除时，绑定的 PV 也是会被回收或删除。那么 StatefulSet 的 PVC 和 PV 如何处理？如何保证该 PVC 和 PV 的重复使用，不被删除。
+
+缩容时，StatefulSet 的 PVC 会继续保留，等待扩容时会重新绑定（相当于缩容有后悔药）。
+
+⚠️upload failed, check dev console
+![[StatefulSet扩缩容下的PVC和PV.png]]
+
+### 稳定的保证
+
+At-Most-One 语义：
+1. 相同标识的 Pod 不会同时运行；
+2. 不同的 Pod 不会同时绑定相同的 PVC。
