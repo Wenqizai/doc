@@ -4431,3 +4431,51 @@ curl -X POST -d "The weather is sweet" 127.0.0.1:8001/api/v1/namespaces/default/
 # GET 
 curl 127.0.0.1:8001/api/v1/namespaces/default/services/kubia-public/proxy/
 ```
+
+## 处理失效节点
+
+### 网络断开
+
+分布式系统典型问题，脑裂问题。当某一节点网络断开下线，之后网络恢复，节点重新上线时，StatefulSet 是如何解决的？
+
+我们知道 StatefulSet 管理的 Pod，每一个都有唯一标识。而在 Statefulset 要保证不会有两个拥有相同标记和存储的 Pod 同时运⾏，当⼀个节点似乎失效时，Statefulset 在明确知道⼀个 pod 不再运⾏之前，它不能或者不应该创建⼀个替换 pod。
+
+**断开网络之后**
+
+断网的 Node 节点显示 NotReady 状态。
+
+```
+kubectl get node 
+```
+
+断网的 Node 节点上 Pod 的状态显示为 Unknown 状态。
+
+```
+kubectl get po 
+```
+
+断网后几分钟，Node 节点上的 Pod 状态显示为 Terminating（注意此时是控制组件标记删除，此时 Pod 还没被删除，等到节点恢复了才会被删除），Pod 被驱逐。
+
+**发生什么**
+
+当一个 Pod 被标记为 Unknown，此时状态是未知的。如果在配置时间内，Pod 重新上传了状态，Pod 会重新被标记为 Running。否则，该 Pod 会被删除。
+
+**网路恢复**
+
+被标记 Terminating 的 Pod 被删除，节点重新调度创建新的 Pod。
+
+### 手动删除 Pod
+
+手动删除，标记 Pod 处于 Terminating 状态，优雅关闭 Pod 并执行删除。
+
+```
+kubectl delete po kubia-0
+```
+
+强制删除 Pod，条件 `--force --grace-period 0`，Pod 会被立刻删除，立刻创建。
+
+```
+kubectl delete po kubia-0 --force --grace-period 0
+```
+
+**注意：** <font color="#e36c09">只要 Kubernetes 没有确认到 Pod 被删除，即使 Pod 处于 Terminating 状态，流量也可以路由到这个 Pod。</font> `
