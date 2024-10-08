@@ -4379,3 +4379,55 @@ spec:
 ```
 curl 127.0.0.1:8001/api/v1/namespaces/default/services/kubia-public/proxy/
 ```
+
+## 伙伴节点
+
+服务发现与引用架构：
+
+1. 部署 StatefulSet 多副本；
+2. 部署一个 headless service，服务发现伙伴节点；
+3. 部署一个 service，对外提供应用服务。
+
+如果要发现伙伴节点，目前我们知道有两种方式：
+
+1. 请求 API Server；（涉及鉴权，代理等，而且普通的 Pod 不应该知晓 Kubernetes 存在，此方式不推荐）
+2. DNS 查找 Headless Service 的域名。（这种方式可以获取所有 Pod 的 IP，但是无法将 PodName 与 Pod IP 对应起来）
+
+### SRV 记录
+
+SRV 记录，即 Service 记录，用来指向指定服务的服务器的主机名和端口号。通过查询 SRV 记录，我们可以知道所有的 PodName 以及其对应的 Pod IP。
+
+以下是临时运行 Pod 的命令，`--rm` 在终止后删除 Pod，并查询 headless service 的 SRV 记录。
+
+```
+# 非 SRV 记录，只能找到所有的 Pod IP, 不知道对应的 Pod
+kubectl run -it srvlookup --image=192.168.5.5:5000/library/tutum/dnsutils --rm --restart=Never -- dig kubia.default.svc.cluster.local 
+
+# SRV 记录可以找到 Pod 对应 IP
+kubectl run -it srvlookup --image=192.168.5.5:5000/library/tutum/dnsutils --rm --restart=Never -- dig SRV kubia.default.svc.cluster.local 
+```
+
+### 更新 StatefulSet 
+
+1. 替换 StatefulSet 的镜像为 `192.168.5.5:5000/library/luksa/kubia-pet-peers:latest`；
+2. 将 replicas 改成 3。
+
+```
+kubectl edit statefulset kubia 
+```
+
+同时 StatefulSet 也支持与 Deployment 和 DaemonSet 一样的滚动升级。具体可以看 kubectl explain  `StatefulSet.spec.updateStrategy`
+
+### 集群数据存储
+
+通过 kubia-public svc 来发送，随机将数据存储到 Pod。通过 kubia-pet-peers 查询 SRV 记录，并获取所有存储到节点上的数据返回。
+
+```
+# POST 
+curl -X POST -d "The sun is shining" 127.0.0.1:8001/api/v1/namespaces/default/services/kubia-public/proxy/
+
+curl -X POST -d "The weather is sweet" 127.0.0.1:8001/api/v1/namespaces/default/services/kubia-public/proxy/
+
+# GET 
+curl 127.0.0.1:8001/api/v1/namespaces/default/services/kubia-public/proxy/
+```
