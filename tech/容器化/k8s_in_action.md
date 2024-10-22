@@ -4539,9 +4539,21 @@ Etcd 和 API Server 可以运行多个实例，并行工作。但是调度器和
 
 Kubelet 是唯一一直作为常规组件来运行的组件，其他组件都是作为 Pod 来运行，部署在 Master 节点。具体可看命名空间 kube-system 相关的 Pod。
 
+## Etcd 
 
+Kubernetes 重启或失败时，创建的 Pod、Deploy、卷、Service 和 Secret 等均不会丢失，可以重新恢复。那么这些信息就需要持久化到某个地方，此时 etcd 就承担该职责。
 
+Etcd 是一个响应快、分布式、一致性的 key-value 存储。其他组件只能通过 API Server 来读取、写入 etcd。同时 etcd 也是存储集群状态和元数据的唯一地方。
 
+Kubernetes 通过将组件与存储分离的方式，可以更加方便对存储系统进行并发控制、已经预留未来替换的可能。
+
+### 并发控制
+
+Etcd，采用乐观锁进行并发控制。关联乐观锁版本字段：`metadata.resourceVersion`
+
+### 存储
+
+[Fetching Title#mg5z](https://github.com/etcd-io/etcd)
 
 
 
