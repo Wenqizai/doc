@@ -1,3 +1,12 @@
+# 集群命令
+
+
+```
+# 查看集群组件状态， master 执行
+kubectl get componentstatuses
+kubectl get cs
+```
+
 # 资源单位
 
 **内存**
@@ -226,6 +235,7 @@ kubetail -l <labelKey>=<labelValue> -n <namespace>
 kubetail <deployName> -n <namespace> --since 10m --tail 10
 ```
 
+
 # 修改资源方式
 
 ## kubectl edit 
@@ -375,6 +385,9 @@ kubectl exec <podName> -- <command>
 
 # 查看 pod 环境变量
 kubectl exec <podName> -- env
+
+# 功能与 exec 一致，区别是 exec 是另起一个进程，而 attach 是附着在容器的主进程
+kubectl attach <podName> -- <command>
 
 ```
 

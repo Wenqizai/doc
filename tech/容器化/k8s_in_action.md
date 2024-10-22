@@ -13,6 +13,12 @@
 
 [YAML 语言教程 - 阮一峰的网络日志](https://www.ruanyifeng.com/blog/2016/07/yaml.html)
 
+## 问题案例收集
+
+1.  `kubectl get cs` 发现 unhealth。
+
+[kubernetes - Kubectl connectivity issue - Stack Overflow](https://stackoverflow.com/questions/54608441/kubectl-connectivity-issue)
+
 # 介绍
 
 Kubernetes，希腊语，领航员、舵手的意思。
@@ -4478,4 +4484,67 @@ kubectl delete po kubia-0
 kubectl delete po kubia-0 --force --grace-period 0
 ```
 
-**注意：** <font color="#e36c09">只要 Kubernetes 没有确认到 Pod 被删除，即使 Pod 处于 Terminating 状态，流量也可以路由到这个 Pod。</font> `
+**注意：** <font color="#e36c09">只要 Kubernetes 没有确认到 Pod 被删除，即使 Pod 处于 Terminating 状态，流量也可以路由到这个 Pod。</font> 
+
+# Kubernetes 架构
+
+Kubernetes 集群由两部分组成：master 节点，工作节点。
+
+## 集群中的组件
+
+**控制平面组件 control-plane**
+
+负责控制整个集群正常运转，并包含以下组件：
+
+- etcd 分布式持久化存储；
+- API 服务器 
+- 调度器 
+- 控制器、管理器 
+
+这些组件用来存储、管理集群的状态。
+
+**工作节点组件**
+
+运行容器的任务依赖于每个工作节点上运行的组件，包含以下：
+
+- Kubelet 
+- Kube-proxy  Kubelet 服务代理 
+- 容器运行时（Docker、rkt 或者其他）
+
+**附件组件** 
+
+- Kubernetes DNS 服务器 
+- 仪表板
+- Ingress 控制器 
+- Heapster （容器集群监控） 
+- 容器网络接口插件 
+
+![|475](集群内的组件架构图.png)
+
+### 组件间通信
+
+如上述架构图，Kubernetes 的组件都是经过 API 服务器，不会直接访问到 etcd。组件之间也不会直接通信，均是经过 API Server 的交互，具有分布式的特点。
+
+API 服务器是<font color="#e36c09">唯一</font>与 etcd 通信的组件，其他组件只能通过 API Server 来修改 etcd 保存的集群的状态。
+
+### 分布式组件 
+
+Master 节点和 Work 节点均可部署多节点，对应的组件也拥有多个实例，用来保证高可用，也是具有分布式。Kubernetes 是如何协调这些节点的？
+
+工作节点组件只能通过 API Server 来通信交互。（类似服务注册/发现中心）
+
+Etcd 和 API Server 可以运行多个实例，并行工作。但是调度器和控制器只能在给定时间内运行一个实例，其余实例处于待命模式。
+
+### 组件的运行
+
+Kubelet 是唯一一直作为常规组件来运行的组件，其他组件都是作为 Pod 来运行，部署在 Master 节点。具体可看命名空间 kube-system 相关的 Pod。
+
+
+
+
+
+
+
+
+
+
