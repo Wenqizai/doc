@@ -7,6 +7,38 @@ kubectl get componentstatuses
 kubectl get cs
 ```
 
+# Etcd 
+
+以下使用的是 v3 版本。
+
+1. 当节点检查失败时，可进行一下配置环境操作：
+
+```
+kubectl exec etcd-k8smaster -it -- sh
+
+# 配置环境信息 (非永久生效)
+export ETCDCTL_API=3
+
+alias etcdctl='etcdctl --endpoints=https://127.0.0.1:2379 --cacert=/etc/kubernetes/pki/etcd/ca.crt --cert=/etc/kubernetes/pki/etcd/server.crt --key=/etc/kubernetes/pki/etcd/server.key'
+```
+
+2. 常用命令
+
+```
+# 检查成员
+etcdctl member list 
+
+# 检查版本
+etcdctl version 
+
+# 列举指定资源下的 key
+etcdctl get /registry/pods/default/ --prefix --keys-only
+
+# 列举资源存储的值
+etcdctl get /registry/pods/default/kubia-0
+```
+
+
 # 资源单位
 
 **内存**
