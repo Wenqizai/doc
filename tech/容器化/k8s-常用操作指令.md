@@ -114,6 +114,10 @@ kubectl delete po --all
 kubectl apply -f <yaml>
 kubectl create -f <yaml>
 
+# 监听 watch
+kubectl get pod --watch 
+kubectl get pod <podName> -o yaml --watch 
+
 ```
 
 

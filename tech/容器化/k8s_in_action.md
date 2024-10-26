@@ -4574,3 +4574,52 @@ Kubernetes 存储的所有数据到 etcd 的 /registry 下。Etcd 存储的数�
 
 ![|475](etcd脑裂场景.png)
 
+## API Server 
+
+API Server 作为一个中心组件，通过 RESTful API 方式来提供给其他组件或者客户端调用，可以修改集群中状态，如 CRUD（Create、Read、Update、Delete）等，并存储到 etcd 中。
+
+API Server 承担与 Etcd 交互的职责，还负责对存储到 Etcd 的对象进行校验，还处理乐观锁。一个请求到 API Server 后具体流程如下图：
+
+⚠️upload failed, check dev console
+![[一个请求到API服务器.png]]
+
+### 请求 API Server 流程
+
+**1. 认证插件认证客户端**
+
+认证插件负责认证客户端的请求，API Server 负责轮流调用这些插件，知道有一个能够确认发送请求方身份。这是通过检查 HTTP 请求中请求头 Authorization 来验证的。
+
+**2. 通过授权插件授权客户端**
+
+授权插件，决定认证的用户是否可以对请求资源执行请求操作。比如，创建 Pod 时，API Server 回轮询所有的授权插件，来确认该用法是否可以在请求空间创建 Pod。一旦插件确认了用户可以执行该操作，API Server 才会继续下一步操作。
+
+**3. 通过准入控制插件验证 AND/OR 修改资源请求**
+
+如果请求尝试修改资源时，即创建、修改或删除，请求需要经过所有准入控制插件的验证才可以通行。注意，如果是读请求，则不会做准入控制的验证。
+
+准入控制插件包括：
+
+- AlwaysPullImages：重写 Pod 的 imagePullPolicy 为 Always，亲自每次部署 Pod 时都拉取镜像；
+- ServiceAccount：验证请求的账户角色，未明确定义则使用默认账户；
+- NamespaceLifecycle：防止在命名空间中创建正在被删除的 Pod，或在不存在的命名空间中创建 Pod。
+- ResourceQuota：保证特定命名空间中的 Pod 只能使用该命名空间分配数据的资源，如 CPU 和内存。
+
+**4. 验证资源以及持久化存储**
+
+请求通过了所有准入控制插件后，API 服务器会验证存储到 etcd 的对象，然后返回一个响应给到客户端。
+
+### API Server 通知客户端
+
+我们知道当客户端修改资源之后，比如创建 Pod，会将信息存储到 etcd。但是 API Server 不会之间去创建 Pod，那是控制器干的活。API Server 需要做的是，将这些变化通知到对应的控制器，由他们来执行具体的操作。
+
+通常，客户端会通过发送 HTTP 监听资源的连接到 API Server。当资源发生变更时，API Server 可以通过该连接来通知到对应的客户端。
+
+⚠️upload failed, check dev console
+![[API-Server的监听和通知.png]]
+
+- 一个简单的客户端监听请求
+
+```
+kubectl get pod --watch 
+kubectl get pod -o yaml --watch 
+```
