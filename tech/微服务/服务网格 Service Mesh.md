@@ -3,6 +3,12 @@
 
 [服务网格（Service Mesh） · Kubernetes 中文指南——云原生应用架构实战手册](https://jimmysong.io/kubernetes-handbook/usecases/service-mesh.html)
 
+## 大神解读
+
+### What is Service Mesh?
+
+[Site Unreachable](https://buoyant.io/what-is-a-service-mesh)
+
 > Buoyant 公司的 CEO Willian Morgan 解释什么是 Service Mesh
 
 Service Mesh，是伴随着云原生技术的发展，Docker 让应用服务打包部署变得更容易，K8s 让批量微服务治理更加简单，而兴起，并得到关注的一项技术。
@@ -24,4 +30,38 @@ Service Mesh，主要用来解决微服务应用之间调用的一些功能支�
 ⚠️upload failed, check dev console
 ![[linkerd-proxy服务网格架构图.png|475]]
 
-[Site Unreachable](https://buoyant.io/what-is-a-service-mesh)
+### Pattern of Service Mesh 
+
+[Pattern: Service Mesh](https://philcalcado.com/2017/08/03/pattern_service_mesh.html)
+
+Service Mesh 的提出是用来解决上千微服务之间交互存在重复逻辑和数据，而凝聚出一种治理模式和平台。
+
+**服务之间通信方式**
+
+- 网线通信（通过信号传输）
+
+1950 以前，一直都是通过线材来连通两台不同的计算机。主要面临问题：计算机成本降低，需要连接的网络也越来越大，需要的网线成本高。
+
+⚠️upload failed, check dev console
+![[计算机之间应用服务通信.png]]
+
+- 路由通信
+
+路由通信，可以做到不需要直接连接线材，而是通过网络包，加密通信来联通每一台的计算机。
+
+
+
+# What
+
+多语言微服务平台解决方案的历史发展。
+
+⚠️upload failed, check dev console
+![[多语言微服务平台解决方案的历史发展.png|475]]
+
+**Service Mesh 的特点**
+
+- 微服务之间通讯的中间层
+- 轻量级网络代理
+- 应用程序无感知
+- 解耦应用的重试、超时、监控、追踪和服务发现。
+
