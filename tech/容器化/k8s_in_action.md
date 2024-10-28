@@ -4722,9 +4722,25 @@ Endpoint 控制器作为活动的组件，定期根据匹配标签选择器的 P
 
 ![Endpoint控制器管理Endpoint资源](Endpoint控制器管理Endpoint资源.png)
 
+## Kubelet 
+
+Kubelet 是运行 kubernetes 集群中的主要组件，负责管理节点上内容组件。Master 也需要部署 Pod，故节点上也会运行 kubelet。
+
+Kubelet 第一个任务就是再 API Server 中创建一个 Node 资源来注册该节点。然后持续监控 API Server 是否把 Pod 分配到该节点，然后启动该 Pod。 
+
+**职责**
+
+1. <font color="#e36c09">启动 Pod</font>，通知 Docker 拉取特定镜像，并启动容器；
+2. <font color="#e36c09">监控 Pod</font>，持续监控运行的容器，向 API Server 报告他们的状态、时间和资源消耗；
+3. <font color="#e36c09">LivenessProbe 角色</font>，充当容器存活探针，探针报错时重启容器；
+4. <font color="#e36c09">终止 Pod</font>，当收到 API Sever Pod 删除通知时，kubelet 负责终止 Pod，并通知 API Sever Pod 已经被终止。
 
 
+**运行 Pod 的两种方式**
 
+如下图，kubelet 不仅仅可以通过 API Server 的通知来创建 Pod。亦可以通过读取本地 Pod 定义文件来创建 Pod。
+
+![](Kubelet运行Pod的两种方式.png)
 
 
 
