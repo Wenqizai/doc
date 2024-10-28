@@ -4694,6 +4694,8 @@ kubectl get pod -o yaml --watch
 
 不同的资源有不同的控制器。
 
+**注意：** 控制器不会直接操作集群上的资源，都是通过监听/查询 API Server 的资源信息，并修改 API Server 资源定义，由调度器去执行具体的资源操作。
+
 **工作流程**
 
 > 循环请求 API Server
@@ -4706,9 +4708,19 @@ kubectl get pod -o yaml --watch
 
 同时除了循环请求 API Server，同时也会监听 API Server 的资源变更并作出反应。同时也会处理来自 API Server 通知的集群信息。如Pod 的崩溃、节点的故障等。
 
+### Replication 管理器
 
+启动 ReplicationController 资源的控制器叫做 Replication 管理器。同理，主要是与 API Server 通信，管理集群中的复制集 replica。
 
+当不会直接运行 Pod，而是发布 Pod 定义到 API 服务器中。
 
+![|500](Replication%20管理器管理资源.png)
+
+### Endpoint 控制器 
+
+Endpoint 控制器作为活动的组件，定期根据匹配标签选择器的 Pod 的 IP 、端口更新端点列表。Endpoint 控制器同时监听 Service 和 Pod。当 Service 被添加、修改、或 Pod 被添加、修改或删除时，控制器会被选中匹配 Service 的 Pod 选择器的 Pod，将其 IP 和端口添加到 Endpoint 资源中。
+
+![Endpoint控制器管理Endpoint资源](Endpoint控制器管理Endpoint资源.png)
 
 
 
