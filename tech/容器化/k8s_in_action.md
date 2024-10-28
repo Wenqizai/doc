@@ -4490,7 +4490,9 @@ kubectl delete po kubia-0 --force --grace-period 0
 
 Kubernetes 集群由两部分组成：master 节点，工作节点。
 
-## 集群中的组件
+## 组成
+
+### 集群中的组件
 
 **控制平面组件 control-plane**
 
@@ -4521,13 +4523,13 @@ Kubernetes 集群由两部分组成：master 节点，工作节点。
 
 ![|475](集群内的组件架构图.png)
 
-### 组件间通信
+#### 组件间通信
 
 如上述架构图，Kubernetes 的组件都是经过 API 服务器，不会直接访问到 etcd。组件之间也不会直接通信，均是经过 API Server 的交互，具有分布式的特点。
 
 API 服务器是<font color="#e36c09">唯一</font>与 etcd 通信的组件，其他组件只能通过 API Server 来修改 etcd 保存的集群的状态。
 
-### 分布式组件 
+#### 分布式组件 
 
 Master 节点和 Work 节点均可部署多节点，对应的组件也拥有多个实例，用来保证高可用，也是具有分布式。Kubernetes 是如何协调这些节点的？
 
@@ -4535,11 +4537,11 @@ Master 节点和 Work 节点均可部署多节点，对应的组件也拥有多�
 
 Etcd 和 API Server 可以运行多个实例，并行工作。但是调度器和控制器只能在给定时间内运行一个实例，其余实例处于待命模式。
 
-### 组件的运行
+#### 组件的运行
 
 Kubelet 是唯一一直作为常规组件来运行的组件，其他组件都是作为 Pod 来运行，部署在 Master 节点。具体可看命名空间 kube-system 相关的 Pod。
 
-## Etcd 
+### Etcd 
 
 Kubernetes 重启或失败时，创建的 Pod、Deploy、卷、Service 和 Secret 等均不会丢失，可以重新恢复。那么这些信息就需要持久化到某个地方，此时 etcd 就承担该职责。
 
@@ -4547,18 +4549,18 @@ Etcd 是一个响应快、分布式、一致性的 key-value 存储。其他组�
 
 Kubernetes 通过将组件与存储分离的方式，可以更加方便对存储系统进行并发控制、已经预留未来替换的可能。
 
-### 并发控制
+#### 并发控制
 
 Etcd，采用乐观锁进行并发控制。关联乐观锁版本字段：`metadata.resourceVersion`
 
-### 存储
+#### 存储
 
 [Fetching Title#mg5z](https://github.com/etcd-io/etcd)
 
 Kubernetes 存储的所有数据到 etcd 的 /registry 下。Etcd 存储的数据的以<font color="#e36c09">多副本冗余的存储方式，不是分片存储</font>。这种方式可以保证节点的高可用，单节点宕机后，集群中仍有可服务的节点。
 
 由于是多副本冗余设计，会涉及副本数据同步，此时就会带来数据一致性问题，如集群中发生脑裂。
-### 数据一致性
+#### 数据一致性
 
 1. 乐观锁控制并发写入；
 2. API 服务器连接的都是授权过的客户端；
@@ -4574,7 +4576,7 @@ Kubernetes 存储的所有数据到 etcd 的 /registry 下。Etcd 存储的数�
 
 ![|475](etcd脑裂场景.png)
 
-## API Server 
+### API Server 
 
 API Server 作为一个中心组件，通过 RESTful API 方式来提供给其他组件或者客户端调用，可以修改集群中状态，如 CRUD（Create、Read、Update、Delete）等，并存储到 etcd 中。
 
@@ -4583,7 +4585,7 @@ API Server 承担与 Etcd 交互的职责，还负责对存储到 Etcd 的对象
 ⚠️upload failed, check dev console
 ![[一个请求到API服务器.png]]
 
-### 请求 API Server 流程
+#### 请求 API Server 流程
 
 **1. 认证插件认证客户端**
 
@@ -4608,7 +4610,7 @@ API Server 承担与 Etcd 交互的职责，还负责对存储到 Etcd 的对象
 
 请求通过了所有准入控制插件后，API 服务器会验证存储到 etcd 的对象，然后返回一个响应给到客户端。
 
-### API Server 通知客户端
+#### API Server 通知客户端
 
 我们知道当客户端修改资源之后，比如创建 Pod，会将信息存储到 etcd。但是 API Server 不会之间去创建 Pod，那是控制器干的活。API Server 需要做的是，将这些变化通知到对应的控制器，由他们来执行具体的操作。
 
@@ -4624,7 +4626,7 @@ kubectl get pod --watch
 kubectl get pod -o yaml --watch 
 ```
 
-## 调度器
+### 调度器
 
 我们在创建 Pod 时，不会指定 Pod 运行到哪个节点上。通常调度 Pod 也会遵循一些原则，如资源限制、标签选择器等，通常这部分的工作是由调度器完成。
 
@@ -4634,7 +4636,7 @@ kubectl get pod -o yaml --watch
 
 调度器的职责就是将节点调度到合适的节点，并最大限度利用硬件资源。
 
-### 调度算法
+#### 调度算法
 
 **默认调度算法**
 
@@ -4677,7 +4679,7 @@ kubectl get pod -o yaml --watch
 
 集群中可以运行多个调度器，也可以只定义实现调度器，来调度部署 Pod。Pod 可以指定 schedulerName 来使用不同调度器来调度，若未指定时由默认调度器来调度，default-scheduler。
 
-## 控制器 
+### 控制器 
 
 控制器主要职责是确保系统真实状态朝 API Server 定义的期望的状态收敛。控制器包括：
 
@@ -4708,7 +4710,7 @@ kubectl get pod -o yaml --watch
 
 同时除了循环请求 API Server，同时也会监听 API Server 的资源变更并作出反应。同时也会处理来自 API Server 通知的集群信息。如Pod 的崩溃、节点的故障等。
 
-### Replication 管理器
+#### Replication 管理器
 
 启动 ReplicationController 资源的控制器叫做 Replication 管理器。同理，主要是与 API Server 通信，管理集群中的复制集 replica。
 
@@ -4716,13 +4718,13 @@ kubectl get pod -o yaml --watch
 
 ![|500](Replication%20管理器管理资源.png)
 
-### Endpoint 控制器 
+#### Endpoint 控制器 
 
 Endpoint 控制器作为活动的组件，定期根据匹配标签选择器的 Pod 的 IP 、端口更新端点列表。Endpoint 控制器同时监听 Service 和 Pod。当 Service 被添加、修改、或 Pod 被添加、修改或删除时，控制器会被选中匹配 Service 的 Pod 选择器的 Pod，将其 IP 和端口添加到 Endpoint 资源中。
 
 ![Endpoint控制器管理Endpoint资源](Endpoint控制器管理Endpoint资源.png)
 
-## Kubelet 
+### Kubelet 
 
 Kubelet 是运行 kubernetes 集群中的主要组件，负责管理节点上内容组件。Master 也需要部署 Pod，故节点上也会运行 kubelet。
 
@@ -4742,12 +4744,43 @@ Kubelet 第一个任务就是再 API Server 中创建一个 Node 资源来注册
 
 ![](Kubelet运行Pod的两种方式.png)
 
+### Kubernetes Service Proxy 
+
+每个节点都会运行 kube-proxy，用来保证客户端可以通过 Kubernetes API 连接到我们定义的服务。简单来说 kube-proxy 可以保证 service ip 和端口能够连接到对应的 Pod，如果有多个 Pod，还能支持复杂均衡。
+
+**代理模式**
+
+> 1. Userspace 代理模式
+
+Kube-proxy 负责配置 iptables 规则，将发往 Service 的 IP 连接重定向到 kube-proxy 代理服务器，由代理服务器连接到 Pod。
+
+⚠️upload failed, check dev console
+![[kube-proxy之userspace代理模式.png]]
 
 
+>2. Iptables 代理模式
 
+为了提供性能，kube-proxy 取消了代理服务器的职责，仅负责修改 iptables 配置。由客户端的 IP 请求直接转发到对应的 Pod，免去中间的代理层。
 
+⚠️upload failed, check dev console
+![[kube-proxy之iptables代理模式.png]]
 
+两种模式的区别，数据包是否会传递到 kube-proxy，也就是数据是否需要转移到<font color="#e36c09">用户空间处理</font>，还是<font color="#e36c09">内核空间处理</font>。两者有巨大的性能差别。
 
+Userspace 代理模式的负载均衡模式是轮询，<font color="#e36c09">iptables 代理模式的负载均衡是随机选择</font>。对于 iptables 代理模式会有出现：⼀个服务有两个 pod⽀持，但有 5 个左右的客户端，如果你看到 4 个连接到 pod A，⽽只有⼀个连接到 pod B。
 
+### DNS Server & IngressController
+
+**DNS Server**
+
+Kubernetes 集群中的 DNS 服务是通过部署 Pod，并对外暴露  kube-dns service 来访问到 kube-dns Pod。Service 的 IP 地址在每个容器的 `/etc/reslv.conf` 文件的 nameserver 定义。
+
+Kube-dns Pod 会利用 API Server 的监听机制来订阅集群中 Service 和 Endpoint 的变动，已经 DNS 记录的变更，确保集群中能获取到最新的 DNS 信息。（注意监听机制，意味者有时差，短时间 DNS 会不可用）
+
+**IngressController**
+
+IngressController 实际上是一组基于 Nginx 实现的反向代理服务器。通过 API Server 的监听机制，订阅集群中定义的 Ingress、Service 以及 Endpoint 资源，并配置该控制器。
+
+IngressController 是与 Service 同级别的东西，尽管 Ingress 资源定义是指向一个 Service。实际上 IngressController 代理的流量是直接转发到 Pod，而不经过 Service IP。（意味者 Pod 可以拿到真实的客户端 IP，而不是转发过来的 Service IP）
 
 
