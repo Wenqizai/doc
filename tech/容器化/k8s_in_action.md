@@ -4677,6 +4677,45 @@ kubectl get pod -o yaml --watch
 
 集群中可以运行多个调度器，也可以只定义实现调度器，来调度部署 Pod。Pod 可以指定 schedulerName 来使用不同调度器来调度，若未指定时由默认调度器来调度，default-scheduler。
 
+## 控制器 
+
+控制器主要职责是确保系统真实状态朝 API Server 定义的期望的状态收敛。控制器包括：
+
+- Replication 管理器（RC 资源的管理器）；
+- ReplicaSet、DaemonSet 以及 Job 控制器；
+- Deployment 控制器；
+- StatefulSet 控制器；
+- Node 控制器；
+- Service 控制器；
+- Endpoints 控制器；
+- Namespace 控制器；
+- PersistentVolume 控制器；
+- 其他
+
+不同的资源有不同的控制器。
+
+**工作流程**
+
+> 循环请求 API Server
+
+控制器的工作流程的核心是**循环控制**，不断查询 API Server 获取当前资源的状态，并于定义的目标状态进行比较。
+
+如果发现目标状态和当前状态不一致，控制器就会采取对应的操作，如新建资源、删除资源。
+
+> API Server 创建 watch，监听资源变更（观察者模式）
+
+同时除了循环请求 API Server，同时也会监听 API Server 的资源变更并作出反应。同时也会处理来自 API Server 通知的集群信息。如Pod 的崩溃、节点的故障等。
+
+
+
+
+
+
+
+
+
+
+
 
 
 
