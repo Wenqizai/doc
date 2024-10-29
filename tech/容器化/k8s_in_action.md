@@ -4783,4 +4783,53 @@ IngressController 实际上是一组基于 Nginx 实现的反向代理服务器�
 
 IngressController 是与 Service 同级别的东西，尽管 Ingress 资源定义是指向一个 Service。实际上 IngressController 代理的流量是直接转发到 Pod，而不经过 Service IP。（意味者 Pod 可以拿到真实的客户端 IP，而不是转发过来的 Service IP）
 
+## 组件协作
+
+如下图，k8s集群中工作中的各组件。
+
+![](k8s集群中各组件的工作.png)
+
+### 工作流
+
+> 执行 kubectl apply -f 命令的工作流
+
+1. 执行 `kubectl apply -f fileName`;
+2. Kubectl 将清单通过 HTTP POST 请求发送到 API Server； 
+3. API Server 检查定义，并存储到 etcd，返回响应给 kubectl。  
+
+![|500](创建Deployment时，k8s的工作流.png)
+
+**Deployment 控制器创建 ReplicaSet** 
+
+当 kubectl 执行 deploy 时，Deployment 控制器会监听到变化。然后控制器就会修改 ReplicaSet 的定义，并由 ReplicaSet 控制器来处理变化。
+
+注意：Deployment 没有直接去修改 Pod 定义。
+
+**ReplicaSet 控制器创建 Pod**
+
+ReplicaSet 控制器监听 ReplicaSet 变化，并根据 Pod 模板和 Replica 数量来创建或修改 Pod。ReplicaSet 的 Pod 模板来源与 Deployment。
+
+ReplicaSet 控制器也会监听 Pod 信息，使用标签选择器来确定哪些 Pod 被管理，并及时调整 Pod 数量。
+
+**调度器分配节点给 Pod**
+
+调度器根据调度算法，将符合的节点分配给 Pod。 
+
+**kubelet 运行 Pod 容器**
+
+Kubelet 监听到 Pod 的变化，对 Pod 执行相应的操作。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
