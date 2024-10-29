@@ -4819,12 +4819,31 @@ ReplicaSet 控制器也会监听 Pod 信息，使用标签选择器来确定哪�
 
 Kubelet 监听到 Pod 的变化，对 Pod 执行相应的操作。
 
+## Pause 容器
 
+当我们创建一个 Pod 时，在 Pod 所在的节点执行 `docker ps`，发现与指定容器一起启动的还有一个 pause 容器，并且启动时间比指定容器早一点点。
 
+```
+cf841697c5fc   192.168.5.5:5000/library/luksa/kubia-pet                        "node app.js"            45 seconds ago   Up 44 seconds             k8s_kubia_kubia-0_default_b31b7ae2-2a87-447c-995b-aae431d17ceb_0
 
+8f020f22b6b7   registry.cn-hangzhou.aliyuncs.com/google_containers/pause:3.5   "/pause"                 46 seconds ago   Up 45 seconds             k8s_POD_kubia-0_default_b31b7ae2-2a87-447c-995b-aae431d17ceb_0
 
+```
 
+仔细观察可发现，Pause 容器的镜像体积很小，查看相关源码发现，Pause 容器不会执行任何功能，以启动就阻塞住，即 pause。每个 Pod 都会有那么一个 Pause 容器，他的生命周期也是与 Pod 绑定。
 
+**Pause 容器的作用**
+
+我们知道每个 Pod 都有独立的 Linux 命名空间，Pod 内容器共享 Linux 命名空间内资源，如 CPU、内存、挂载卷、网络等。那么就需要那么的一个容器来记录这些信息，与应用容器共存。
+
+应用容器会重启，重启后需要知道重启前相关 Linux 命名空间信息，那么 Pause 容器就会承担该职责。无论 Pod 内有多少个容器，它们都会使用与 Pause 容器相同的 Linux 命名空间。
+
+当 Pod 内容器共享相同的 Linux 命名空间，容器之间通信和访问相同资源就变得简单多了。比如，容器之间访问可以通过 127.0.0.1 进行访问。
+
+参看文档：[K8s集群中pause容器是干嘛的 - Mr.Ye Blog](https://system51.github.io/2019/08/26/pause/)
+
+⚠️upload failed, check dev console
+![[Pause容器共享Linux命名空间.png]]
 
 
 
