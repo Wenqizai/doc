@@ -4840,10 +4840,91 @@ cf841697c5fc   192.168.5.5:5000/library/luksa/kubia-pet                        "
 
 当 Pod 内容器共享相同的 Linux 命名空间，容器之间通信和访问相同资源就变得简单多了。比如，容器之间访问可以通过 127.0.0.1 进行访问。
 
+Pause 容器通常会被分配一个 IP 地址，这个地址就是 Pod 的 IP 地址。Pod 内其他容器都是通过这个 IP 地址进行通信。
+
 参看文档：[K8s集群中pause容器是干嘛的 - Mr.Ye Blog](https://system51.github.io/2019/08/26/pause/)
 
 ⚠️upload failed, check dev console
 ![[Pause容器共享Linux命名空间.png]]
+
+## 网络
+
+Kubernetes 集群中的 Pod 之间通信是通过一个唯一 IP 和非 NAT 网络进行通信。但是 Kubernetes 并不负责这块网络，而是由系统管理员或者 Container Network Interface (CNI) 插件建立。
+
+Kubernetes 并不会要求使用特定的网络技术，但是会遵守一些原则和基本规范：
+
+- **平面网络模型**
+
+每个 Pod 都会获得一个唯一的 IP 地址，Pod 与 Pod 之间通过改 IP 通信，而不需要经过 NAT。
+
+不经过 NAT 的好处是，Pod 可以之间获取到真实通信的 Pod IP。
+
+- **网络策略**
+
+Kubernetes 支持网络策略（Network Policies），允许用户定义 Pod 之间的通信规则。基于网络策略，用户可以控制哪些 Pod 可以相互通信，增加安全性。
+
+- **容器网络接口 CNI，可扩展性** 
+
+CNI 插件负责为 Pod 提供网络连接和 IP 地址分配。常见的 CNI 插件包括 Calico、Flannel、Weave Net 等。
+
+- **跨节点通信**
+
+Kubernetes 网络允许跨节点的 Pod 进行通信。
+
+- **网络隔离**
+
+通过使用网络策略和不同的命名空间，Kubernetes 可以实现网络隔离，确保不同应用程序或环境之间的网络流量不会相互干扰。
+
+![|475](Kubernetes集群中Pod之间非NAT通信.png)
+
+### 同节点网络通信
+
+当 Pod 启动时，Pause 容器随之启动。Pause 容器启动之前会创建一个虚拟 Ethernet 接口对，即一个 veth pair。
+
+其中一个端点 veth123 保留在主机的命名空间中，而另外一个端点移入容器网络命名空间，并重命名为 eth0。
+
+主机网络命名空间的接口会绑定到容器运行时配置使用的网络桥接 Bridge 上。从网桥 Bridge 的地址段中取 IP 地址赋值给到容器内的 eth0 接口上。（Pod IP 段是从 Bridge 网段分配的）
+
+容器内的数据包流转：*容器 -> eth0 -> veth -> bridge*。
+
+Pod A 与 Pod B 的数据包流转：*容器 A -> eth0 -> veth -> bridge -> veth -> eth0 -> 容器 B*。
+
+![|475](同节点网络的接口连接.png)
+
+### 不同节点网络通信 
+
+我们之间同节点通信和 IP 分配依赖于网桥 Bridge。那么 Kubernetes 不同节点之间建立通信需要保证<font color="#e36c09">不同网桥使用的是非重叠地址段</font>，防止不同节点上的 Pod 拿到同一个 IP。
+
+连接不同网桥的方式有：overlay、underlay、或常规的三层路由。
+
+![](不同节点Pod之间通过商城网络通信.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
