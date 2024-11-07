@@ -4750,7 +4750,7 @@ Kubelet 第一个任务就是再 API Server 中创建一个 Node 资源来注册
 
 **代理模式**
 
-> 1. Userspace 代理模式
+#### Userspace 代理模式
 
 Kube-proxy 负责配置 iptables 规则，将发往 Service 的 IP 连接重定向到 kube-proxy 代理服务器，由代理服务器连接到 Pod。
 
@@ -4758,7 +4758,7 @@ Kube-proxy 负责配置 iptables 规则，将发往 Service 的 IP 连接重定�
 ![[kube-proxy之userspace代理模式.png]]
 
 
->2. Iptables 代理模式
+#### Iptables 代理模式
 
 为了提供性能，kube-proxy 取消了代理服务器的职责，仅负责修改 iptables 配置。由客户端的 IP 请求直接转发到对应的 Pod，免去中间的代理层。
 
@@ -4910,8 +4910,28 @@ Pod A 与 Pod B 的数据包流转：*容器 A -> eth0 -> veth -> bridge -> veth
 
 SDN，软件定义网络技术，可以简化上述路由和配置问题。SDN 可以让节点忽略底层网络拓扑，无论多复杂，结果就像连接到同一个网关上。Pod 发出的报文会被封装，通过网络发送给运行其他 Pod 的网络，然后被解封装，以原始格式传递给 Pod。
 
+## 服务
 
+Kubernetes 会给每个 Service 分配一个虚拟 IP 地址 (ClusterIP)。Pod 可以通过连接到该 IP 和端口，访问到 Service 关联的 Pod 服务。 
 
+Service IP 是虚拟的，没有分配到任何网络接口，当数据包离开节点时，不会列为数据包的源和目的 IP 地址。Service IP 是不能 ping 的。
+
+```
+Kubernetes Service IP 不能被 ping 通是因为它是一个虚拟 IP，且 ICMP 请求不会被路由到后端 Pod。
+
+在 Kubernetes 集群中是可以 ping 通 service 的, 因为节点中存在 kube-proxy 代理。
+```
+
+### kube-proxy 实现 Service 可发现可路由
+
+1. 当在 API Server 创建一个 Service 时，会立刻分配一个虚拟 IP 给这个 Service；
+2. 随后 API Server 通知所有运行在工作节点上的 kube-proxy 客户端，有个新 Service 被创建；
+3. Kube-proxy 收到通知后，改写 iptables 规则（**iptables 代理模式**）；
+4. Iptables 规则改写后，每个路由到 Service 的 IP/端口对 的数据包都可以被解析，并且目的地址会被修改，数据包会被路由到 Service 关联的 Pod。
+
+Iptables 代理模式下，kube-proxy 除了监听 Service 被更改，还会监听 Endpoint 对象的更改（Endpoint 对象保存 Pod IP/端口对）。
+
+![|500](Service路由包流程图.png)
 
 
 
