@@ -202,3 +202,54 @@ Service Mesh，并不是一项新提出的技术，在传统的应用程序架�
 在云原生架构下，Kubernetes 增强的应用的横向扩容能力，用户可以快速地编排出复杂环境、复杂依赖关系的应用程序，同时开发者又无须过分关心应用程序的监控、扩展性、服务发现和分布式追踪这些繁琐的事情而专注于程序开发，赋予开发者更多的创造性。
 
 此时，Service Mesh 的轻量级、应用无感知，控制面板管理等特性，为开发者提供了便捷。
+
+# 企业级服务网格
+
+服务网格实际上是一种 SDN，等同于 OSI 模型中的会话层（注：OSI参考模型并不是一个标准，而是一个在制定标准时所使用的概念性框架。）。
+
+关于 OSI 七层网络模型：[Site Unreachable](https://aws.amazon.com/cn/what-is/osi-model/)
+
+关于 SDN：SDN的核心思想是通过软件来控制网络硬件，从而使网络更加灵活、可编程和易于管理。
+
+## 发展之路
+
+Kubernetes 对容器的编排、网络互通互联已经提供基础措施。但是对流量更细粒度的控制，如路由、限流、认证、度量、监控问题，还是需要开发者去解决。在微服务的演进过程中，如何控制海量、多语言、多版本共存的微服务，成为一个新的问题。
+
+服务网格的提出，就是用来解决上述问题。服务网格是建立在物理或者虚拟网络层之上，基于策略的微服务流量控制，具有以下特点
+
+- 开发者驱动
+- 可配置策略
+- 服务优先的网络配置而不是协议
+
+## 南北/东西流量
+
+**南北流量**：客户端与 API 网关或负载均衡器之间的网络流量。
+
+**东西流量**：API 网关、负载均衡器、微服务、数据库之间的网络流量（占 90%）。
+
+服务网格既可以管理南北流量，又可以管理集群内的东西流量。
+
+
+参看文档：
+
+[东西流量和南北流量&Service Mesh和API Gateway的关系\_微服务架构 东西向 南北向-CSDN博客](https://blog.csdn.net/weixin_45423952/article/details/120869105)
+
+[K8s 系列 南北流量和东西流量 | samzong](https://samzong.me/2022/09/12/k8s-xi-lie-nan-bei-liu-liang-he-dong-xi-liu-liang/)
+
+## 替代 API 网关？
+
+服务网格也可以承接东西流量，传统的 API 网关仅用来承接南北流量。而且有些服务网格自带 API 网关，如 Istio 内置基于 Envoy 的 API 网关，是不是就可以用服务网格替换传统的 API 网关呢？
+
+实际上，API 网关也是有存在的必要的。API 网关不单单承接南北流量，而且会承接产品 API 的定制要求，和 API 的一些鉴权、认证要求。这些特制化的要求，是很难纳入统一管理的服务网格之中，如下图：
+
+⚠️upload failed, check dev console
+![[Kubernetes ingress, Istio gateway and API gateway 的功能对比.png]]
+
+目前全新的架构，API 网关 + Sidecar Proxy 作为服务网格流量入口：
+
+⚠️upload failed, check dev console
+![[采用 API Gateway + Sidecar Proxy 为服务网格提供流量入口.png]]
+
+强烈推荐阅读：
+
+[如何为服务网格选择入口网关？ | 云原生社区（中国）](https://cloudnative.to/blog/how-to-pick-gateway-for-service-mesh/)

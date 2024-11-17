@@ -13,6 +13,10 @@
 
 [YAML 语言教程 - 阮一峰的网络日志](https://www.ruanyifeng.com/blog/2016/07/yaml.html)
 
+**了解 Kubernetes 网路架构必读：**
+
+[如何为服务网格选择入口网关？ | 云原生社区（中国）](https://cloudnative.to/blog/how-to-pick-gateway-for-service-mesh/)
+
 ## 问题案例收集
 
 1.  `kubectl get cs` 发现 unhealth。
@@ -4769,6 +4773,14 @@ Kube-proxy 负责配置 iptables 规则，将发往 Service 的 IP 连接重定�
 
 Userspace 代理模式的负载均衡模式是轮询，<font color="#e36c09">iptables 代理模式的负载均衡是随机选择</font>。对于 iptables 代理模式会有出现：⼀个服务有两个 pod⽀持，但有 5 个左右的客户端，如果你看到 4 个连接到 pod A，⽽只有⼀个连接到 pod B。
 
+Userspace 代理模式提供负载均衡和失败重试功能，而 iptables 代理模式没有。
+
+#### IPVS 代理模式
+
+该模式和 iptables 类似，Kube-proxy 监控 Pod 的变化并创建相应的 ipvs rules。ipvs 也是在 kernel 模式下通过 netfilter 实现的，但采用了 hash table 来存储规则，因此在规则较多的情况下，Ipvs 相对 iptables 转发效率更高。除此以外，ipvs 支持更多的 LB 算法。如果要设置 Kube-proxy 为 ipvs 模式，必须在操作系统中安装 IPVS 内核模块。
+
+⚠️upload failed, check dev console
+![[kube-proxy之ipvs代理模式.png]]
 ### DNS Server & IngressController
 
 **DNS Server**
