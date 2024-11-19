@@ -253,3 +253,16 @@ Kubernetes 对容器的编排、网络互通互联已经提供基础措施。但
 强烈推荐阅读：
 
 [如何为服务网格选择入口网关？ | 云原生社区（中国）](https://cloudnative.to/blog/how-to-pick-gateway-for-service-mesh/)
+
+# 架构演进
+
+### Ingress 或边缘代理
+
+**边缘代理：** 一种位于网络边缘的代理服务器，<font color="#e36c09">相对于 sidecar 代理，独立 Pod 部署。</font> 主要区分方式就是时候独立部署，位于网络的边缘。
+
+Service Mesh 之前，通常使用 Ingress Controller 或边缘代理服务器，做集群内外流量的方向代理，根据配置的 Ingress，将流量转发到不同的 Service。如常用的 Traefik 或 Nginx Ingress Controller。
+
+这种方式，Kubernetes 原有提供的能力，属于 L7 层代理。但是这种架构也就无法管理服务之间的东西流量。
+
+![](Ingress或边缘代理架构图.png)
+
