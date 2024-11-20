@@ -266,3 +266,40 @@ Service Mesh 之前，通常使用 Ingress Controller 或边缘代理服务器�
 
 ![](Ingress或边缘代理架构图.png)
 
+## 路由器网格
+
+边缘网络架构，无法管理服务间的东西流量。因此可以考虑集群类添加一个 Router 层，让集群内所有流量都通过该路由器。
+
+这个架构的好处就是，无需对原有的微服务做改造，容易迁移进来。当服务多起来时，管理这些微服务的路由也是一种灾难。
+
+![](路由器网格架构图.png)
+
+## Proxy_Per_Node (Linkerd)
+
+每个节点都部署一个代理，比如借助 Kubernetes 的 DaemonSet。（Linkerd第一代就是使用这种方式部署的，一代的Linkerd使用Scala开发，基于JVM比较消耗资源，二代的Linkerd使用Go开发。）
+
+![](Proxy%20per%20Node架构图.png)
+
+这种架构相对于 Sidecar 方式更节省资源。但是也面临控制粒度不够细，单点故障导致整个节点服务不能访问的问题。
+
+## Sidecar代理/Fabric模型
+
+接近 Service Mesh 的架构心态，唯一缺的就是控制平面。
+
+![](Sidecar代理-Fabric模型架构图.png)
+
+## Sidecar代理/控制平面
+
+目前大多数 Service Mesh 的架构图。代理以 Sidecar 方式注入 Pod，对服务流量做细粒度权限和流量控制。
+
+唯一缺点，每个 Pod 都需要注入，占用资源较多。
+
+![](Sidecar代理-控制平面架构图.png)
+
+
+
+
+
+
+
+
