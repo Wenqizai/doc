@@ -4994,10 +4994,67 @@ Kubernetes 选择运行多实例时，只能有一个实例允许运行操作。
 ⚠️upload failed, check dev console
 ![[控制器和调度器Leader机制.png]]
 
+# 权限控制
+
+## 认证
+
+客户端发起的请求都会经过 API Server 的一系列认证插件，确定请求的用户信息，包括用户名、用户 ID 和组信息。
+
+请求完成认证阶段之后，才能进入授权阶段。
+
+认证方法包括：
+
+- 客户端证书
+- 传入在 HTTP 头中的认证 token
+- 基础的 HTTP 认证
+- 其他插件功能
+
+### 用户和组
+
+> 用户
+
+用户包括，真实请求用户和 Pod。通常真实用户通过外部系统登录，携带 token 方式。而 Pod 是通过 ServiceAccount 机制来登录。
+
+> 组
+
+组可以给多个用户授予权限。组是一串字符串，代表不同的权限含义。比如：
+
+- `System:unauthenticated` 组：用于所有认证插件都不会认证客户端身份的请求。
+
+通常组还可以指定的命名空间生效，如：
+
+```
+system:serviceaccounts:<namespace>
+```
+
+### ServiceAccount 
+
+ServiceAccount 是一种资源，指定特定的命名空间，同时每个命名空间会自动创建一个默认的 ServiceAccount （Pod 会一直使用）。
+
+其中在 Pod 中，路径 `/var/run/secrets/kubernetes.io/serviceaccount` 保存一下文件来表明该 Pod 的 ServiceAccount 信息。
+
+```
+ca.crt  namespace  token
+```
+
+> ServiceAcccount 与 Pod 的关联
+
+1. 每个命名空间都有默认的 ServiceAccount：default
+2. 多个 Pod 可以使用相同的 ServiceAccount，但是一个 Pod 只能关联一个 ServiceAccount； 
+3. Pod 只能使用之间命名空间的 ServiceAccount。 
+
+![](ServiceAccount与Pod关联关系.png)
+
+通常我们可以在 Pod 的 manifest 文件中指定 ServiceAccount，如果不显示指定，Pod 就会使用 default ServiceAccount。
+
+> 创建 ServiceAccount 
 
 
+```
+kubectl create serviceaccount foo 
 
-
+kubectl describe sa foo
+```
 
 
 

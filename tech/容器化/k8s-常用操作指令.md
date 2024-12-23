@@ -467,6 +467,17 @@ dig kubernetes.default.svc.cluster.local、
 # Pod 内执行
 cat /etc/resolv.conf
 ```
+
+# ServiceAccount
+
+```
+// sa 为一种资源， 操作指令和大多数资源相似
+kubectl get sa (serviceaccount)
+
+kubectl create serviceaccount foo 
+
+kubectl describe sa foo
+```
 # 插件
 
 ## Krew 
