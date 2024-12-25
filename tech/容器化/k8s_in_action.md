@@ -5057,10 +5057,40 @@ kubectl describe sa foo
 ```
 
 
+> 将 ServiceAccount 分配给 Pod 
 
+```
+vim curl-custom-sa.yaml
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: curl-custom-sa
+spec:
+  serviceAccountName: foo
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+  - name: ambassador
+    image: 192.168.5.5:5000/library/luksa/kubectl-proxy:1.6.2 
+```
 
+> 查看挂载到 Pod 容器内的 token 
 
+同一个 Pod 内，容器都是同一个 token。
+
+```
+kubectl exec -it curl-custom-sa -c main -- cat /var/run/secrets/kubernetes.io/serviceaccount/token 
+
+kubectl exec -it curl-custom-sa -c ambassador -- cat /var/run/secrets/kubernetes.io/serviceaccount/token 
+```
+
+> 使用 ambassador 代理容器与 API Server 通信
+
+```
+kubectl exec -it curl-custom-sa -c main -- curl localhost:8001/api/v1/pods
+```
 
 
 
