@@ -5092,12 +5092,29 @@ kubectl exec -it curl-custom-sa -c ambassador -- cat /var/run/secrets/kubernetes
 kubectl exec -it curl-custom-sa -c main -- curl localhost:8001/api/v1/pods
 ```
 
+## 基于角色的权限控制
 
+早期获取到 Pod 的 token 可以集群中进行操作。意味着，在集群内启动一个 Pod 就可以获取到 token 进行整个集群的攻击。
 
+Kubernetes 1.8.0 版本后，RBAC 会阻止未授权的用户查看和修改集群状态。
+### RBAC 资源
 
+- 角色资源：**Role** 角色、**ClusterRole** 集群角色
 
+- 绑定：**RoleBinding** 角色绑定、**ClusterRoleBinding** 集群角色绑定
 
+以上**角色资源**通过**绑定**到特定的用户、组或 ServiceAccounts 上。
 
+链路：权限资源 <- 角色  -> 绑定 -> 用户、组或 ServiceAccounts。
+
+![|450](角色资源绑定权限用户.png)
+
+**其中**
+
+1. Role 和 RoleBinding：绑定是命名空间的资源
+2. ClusterRole 和 ClusterRoleBinding：绑定是集群级别的资源。
+
+![](集群和命名空间的角色绑定.png)
 
 
 
