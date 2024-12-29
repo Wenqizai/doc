@@ -5116,13 +5116,66 @@ Kubernetes 1.8.0 版本后，RBAC 会阻止未授权的用户查看和修改集�
 
 ![](集群和命名空间的角色绑定.png)
 
+### Role&RoleBinding
+
+**定义 Role**
+
+Role 定义可以操作哪些资源。以下定义了一个 Role，允许用户获取并列出 default 命名空间中的服务。
+
+```
+vim service-reader.yaml 
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: foo  # Role 所在的命名空间 
+  name: service-reader
+rules:
+  - apiGroups: [""]
+    verbs: ["get", "list"]
+    resources: ["services"] # 可以操作的资源为 service
+```
+
+⚠️upload failed, check dev console
+![[Role允许的资源范围.png]]
 
 
+**创建角色**
+
+以下可以针对不同的命名空间创建不同的 Role。
+
+```
+kubectl create -f service-reader.yaml -n foo 
+
+kubectl create -f service-reader.yaml -n bar 
+```
+
+**绑定角色到 ServiceAccount**
+
+通过创建一个 RoleBinding 来实现将角色绑定到主体，如用户、ServiceAccount 或组。
+
+RoleBinding 可以绑定不同命名空间的 ServiceAccount，可以赋予不同命名空间 ServiceAccount 相同的资源权限。
+
+```
+kubectl create rolebinding test --role=service-reader --serviceaccount=foo:default -n foo
+
+kubectl create rolebinding test --role=service-reader --serviceaccount=default:default -n default
+```
 
 
+⚠️upload failed, check dev console
+![[RoleBinding将Role和ServiceAccount进行绑定.png]]
 
+**查看资源**
 
+```
+# 查看绑定的资源
+kubectl get rolebinding test -o yaml
 
+# 查看资源的权限
+curl localhost:8001/api/v1/namespaces/foo/services
+```
 
-
+⚠️upload failed, check dev console
+![[RoleBinding绑定不同命名空间的ServiceAccount.png]]
 
