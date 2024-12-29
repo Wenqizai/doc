@@ -5179,3 +5179,96 @@ curl localhost:8001/api/v1/namespaces/foo/services
 ⚠️upload failed, check dev console
 ![[RoleBinding绑定不同命名空间的ServiceAccount.png]]
 
+### ClusterRole&ClusterRoleBinding
+
+Role 和 RoleBinding 均属于单一命名空间的资源，但是 RoleBinding 可以绑定不同命名空间的 Role。ClusterRole 和 ClusterRoleBinding ，属于集群级别的 RBAC 资源，不属于命名空间。
+
+假如有一个场景，我们需要访问不同命名空间的资源，使用 Role 和 RoleBinding 时，我们需要在不同的命名空间中创建 Role，并将 RoleBinding 绑定这些 Role。如果命名空间很多，对于维护这些 Role 的成本也会越来越高。ClusterRole 和 ClusterRoleBinding 就是用来解决该类场景问题。
+
+还有一种场景是，Node、PV、PVC、Namespace 等不属于命名空间的资源，和一些不表示资源的 URL 路径，如 `/healthz`。我们就不能采用命名空间的 Role 来控制。ClusterRole 出现也是用来解决该类问题。
+
+```
+ClusterRole 是⼀种集群级资源，它允许访问没有命名空间的资源和⾮资源型的 URL，或者作为单个命名空间内部绑定的公共⾓⾊，从⽽避免必须在每个命名空间中重新定义相同的⾓⾊。
+```
+
+**定义 ClusterRole**
+
+该 ClusterRole 是用来查看 pv。
+
+```
+kubectl create clusterrole pv-reader --verb=get,list --resource=persistentvolumes 
+```
+
+查看 ClusterRole
+
+```
+kubectl get clusterrole pv-reader -o yaml 
+```
+
+**ClusterRoleBinding 绑定 Role 和 ServiceAccount**
+
+
+```
+kubectl create clusterrolebinding pv-terst --clusterrole=pv-reader --serviceaccount=foo:default
+```
+
+如图：ClusterRoleBinding 绑定 ClusterRole 和 foo 命名空间的 ServiceAccount。
+
+⚠️upload failed, check dev console
+![[ClusterRoleBinding.png]]
+
+
+
+<font color="#e36c09">注意：</font> RoleBinding 也可以绑定 ClusterRole，但是绑定的主体 ServiceAccount 不会被授予集群的权限。
+
+⚠️upload failed, check dev console
+![[RoleBinding绑定ClusterRole不会被授予权限.png]]
+
+
+**验证 ClusterRole 的资源权限**
+
+
+```
+curl localhost:8001/api/v1/persistentvolumes
+```
+
+
+**ClusterRole 绑定的能力**
+
+ClusterRole 可以绑定 RoleBinding，也可以绑定 ClusterBinding。两者的区别是，绑定 RoleBinding 时只能看到该命名空间的资源。绑定 ClusterBinding 可以看到所有的命名空间的资源。
+
+
+```
+# 绑定 RoleBinding 的 ClusterRole
+kubectl get clusterrole view -o yaml 
+```
+
+如图，使用 ClusterRole 和 ClusterRoleBinding 可以查看所有命名空间的 Pod 资源。
+
+⚠️upload failed, check dev console
+![[ClusterRole绑定资源.png]]
+
+**使用 RoleBinding 替换 ClusterRoleBinding**
+
+1. 先删除原有的 ClusterRoleBinding
+
+```
+kubectl delete clusterrolebinding view-test 
+```
+
+2. 创建新的 Rolebinding，并绑定到 ClusterRole 
+
+如下图：该 ServiceAccount 只有当前命名空间的 Pod 资源权限。
+
+```
+kubectl create rolebinding view-test  --clusterrole=view --serviceaccount=foo:default -n foo 
+```
+
+⚠️upload failed, check dev console
+![[Rolebinding替换ClusterRoleBinding.png]]
+
+**组合使用不同的 Role 和 RoleBinding**
+
+⚠️upload failed, check dev console
+![[何时使用Role和ClusterRole.png]]
+

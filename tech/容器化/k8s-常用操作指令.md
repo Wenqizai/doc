@@ -478,6 +478,14 @@ kubectl create serviceaccount foo
 
 kubectl describe sa foo
 ```
+
+## 资源控制
+
+```
+kubectl create sa
+kubectl create role/clusterrole
+kubectl create rolebinding/clusterrolebinding <bindingName> --role/clusterrole=<roleName> --serviceaccount=<namespace:saName>
+```
 # 插件
 
 ## Krew 
