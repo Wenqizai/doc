@@ -29,3 +29,13 @@
 # 文档博客
 
 [最近学习了Http连接池 - 五月的仓颉 - 博客园](https://www.cnblogs.com/xrq730/p/10963689.html)
+
+
+# 选型
+
+HttpClient 与 okHttp 中选择，趋向使用 okHttp。
+
+**注意：** Spring RestTemplate 的默认实现是 HttpURLConnection，性能较差。可以通过 `RestTemplateBuilder builder` 实现为 HttpClient。也可以替换成 okhttp。其中 Spring Cloud 的 Feign 调用也是依赖于 RestTemplate。
+
+[七大主流的HttpClient程序比较-阿里云开发者社区](https://developer.aliyun.com/article/1416617)
+[Which Java HTTP client should I use in 2024?](https://www.wiremock.io/post/java-http-client-comparison)

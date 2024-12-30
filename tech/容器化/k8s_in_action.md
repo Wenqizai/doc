@@ -5272,3 +5272,42 @@ kubectl create rolebinding view-test  --clusterrole=view --serviceaccount=foo:de
 ⚠️upload failed, check dev console
 ![[何时使用Role和ClusterRole.png]]
 
+#### 默认的 ClusterRole 和 ClusterRoleBinding 
+
+Kubernetes 提供了一系列默认的 ClusterRole 和 ClusterRoleBinding，每次 API Server 重新启动时都会更新他们。
+
+好处是当误删除一些角色和角色绑定时，或者升级 Kubernetes 版本时，可能重新创建这些默认的角色和绑定。
+
+```
+kubectl get clusterrole 
+kubectl get clusterrolebinding 
+```
+
+>**view ClusterRole**
+
+允许对资源的只读访问，除了 Role、RoleBinding 和 Secret 资源之外。
+
+不允许读取 Sercret 是因为 Sercret 包含认证 token，该 token 的权限比 view ClusterRole 的权限大，需要禁止权限扩散。
+
+> **edit ClusterRole**
+
+允许对资源的修改。允许 Sercret 的读取与修改，但不运行 Role 和 RoleBinding 资源的查看和修改。同样是要禁止权限扩散。
+
+> **admin ClusterRole**
+
+ 赋予一个命名空间全部的控制权。
+
+ClusterRole 的主体可以读取和修改命名空间中的任何资源，除了 ResourceQuota 和命名空间资
+源本⾝。*Edit 和 admin ClusterRole 之间的主要区别是能否在命名空间中查看和修改 Role 和 RoleBinding。*
+
+>Cluster-admin ClusterRole 
+
+允许对 Kubernetes 集群总的完全控制权限。
+
+## 权限实践
+
+业务 Pod，不应当授予集群的权限，应当每个 Pod 创建一个特定的 ServiceAcount，并且有 RoleBinding 绑定定制的 Role。而不是使用 ClusterRole 和 ClusterRoleBinding，防止权限的扩散。
+
+此时业务 Pod 的权限限制在当前的命名空间，如果需要读取其他命名空间 Pod 信息。应当是不同命名空间建立不同的 ServiceAccount，通过 RoleBinding 来绑定不同的命名空间的 ServiceAccount 来实现。
+
+同时对于业务的 ServiceAccount 应当限制最低的权限，防止权限扩散，控制到 Kubernetes 集群。
