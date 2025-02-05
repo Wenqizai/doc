@@ -5619,21 +5619,112 @@ kubectl exec -it pod-with-readonly-filesystem -- touch /volume/new-file
 kubectl exec -it pod-with-readonly-filesystem -- ls -la /volume/new-file
 ```
 
+## 隔离 Pod 的网络 NetworkPolicy
 
+Pod 与 Pod 之间的网络通信和网络隔离可以通过配置 `NetworkPolicy`。该配置应用到标签选择器的 Pod，规定了 Pod 的入向 ingress 和出向 egress。
 
+除了标签选择器规则，还可以配置 namespace 规则和 CIDR (Classless Inter-Domain Rounting 无类别域间路由) 指定的 IP 地址段。
 
+### 命名空间与 Pod 标签选择器
 
+默认情况下，Pod 允许任何命名空间来访问 Pod。当然我们也可以指定命名空间的 Pod 来访问。
 
+> 允许同一个命名空间，指定 Pod 访问
 
+如下，仅允许同一个命名空间下标签为 `app=webserver` 的 Pod 访问标签为 `app=database` 的 Pod，而且仅能访问端口 5432。
 
+```
+vim namespace-networkpolicy.yaml 
 
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-netpolicy   
+spec:
+  podSelector: 
+    matchLabels: 
+      app: database 
+  ingress: 
+  - from: 
+    - podSelector: 
+        matchLabels: 
+          app: webserver 
+	ports: 
+	- port: 5432 
+```
 
+![](同一个命名空间Pod网络访问控制.png)
 
+> 不同命名空间下 Pod 访问控制 
 
+以下，仅允许命名空间标签为 `tenant=manning` 的 Pod 访问标签为 `app=shopping-cart` 的 Pod。
 
+**注意：** 命名空间也是有标签的。
 
+```
+vim different-namespace-networkpolicy.yaml 
 
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shoppingcart-netpolicy    
+spec:
+  podSelector: 
+    matchLabels: 
+      app: shopping-cart  
+  ingress: 
+  - from: 
+    - namespaceSelector: 
+        matchLabels: 
+          tenant: manning  
+	ports: 
+	- port: 80  
+```
 
+![](不同命名空间Pod网络访问控制.png)
 
+### CIDR 隔离网络 
 
+CIDR 指定 IP 段控制 Pod 访问，如下控制允许访问的 IP 范围为： 192.168.0.1 - 192.168.0.255。
+
+```
+vim cidr-networkpolicy.yaml 
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: shoppingcart-netpolicy    
+spec:
+  podSelector: 
+    matchLabels: 
+      app: shopping-cart  
+  ingress: 
+  - from: 
+    - ipBlock: 
+      cidr: 192.168.0.1/24 
+	ports: 
+	- port: 80  
+```
+
+### 限制 Pod 对外访问流量 
+
+如下，限定 Pod 仅可以访问标签为 `app=webserver` 的 Pod，除此之外不能访问任何地址，无论是其他 Pod，还是任何其他 IP，无论是集群内部还是外部。
+
+```
+vim egress-networkpolicy.yaml 
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: egress-netpolicy   
+spec:
+  podSelector: 
+    matchLabels: 
+      app: webserver  
+  egress: 
+  - to: 
+    - podSelector: 
+        matchLabels: 
+          app: database  
+```
 
