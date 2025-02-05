@@ -5396,3 +5396,66 @@ spec:
 此时该 Pod 可以通过宿主 IP + 9000 来访问，也可以通过 Pod IP + 8080 来访问。
 
 ![](节点只会调度一个hostPort的Pod.png)
+
+### 使用宿主节点的 PID 和 IPC 命名空间 
+
+**为何使用？**
+
+Pod 使用宿主节点的 PID 和 IPC 命名空间的好处：
+
+> PID 
+
+Pod 使用宿主节点的 PID 命名空间，意味着可以看到宿主节点运行 Pod 的进程。进而可以对宿主节点的进程做一些监控，同时也可以使用进程进行通信。
+
+对进程的调试和故障排查提供了遍历。
+
+> IPC 
+
+IPC 是进程间的一种通信方式，常用的 IPC 通信有：管道、共享内存、信号和套接字等方式。
+
+Pod 使用宿主节点的 IPC 命名空间，意味着可以进行进程间的通信。进程间通信的好处是，性能高效、共享内存和简化配置。
+
+**注意：** 使用宿主节点的命名空间都应该注意安全性、隔离性和资源竞争性等问题。
+
+**如何使用？**
+
+1. 创建 Pod 
+
+```
+vim pod-with-host-pid-and-ipc.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-host-pid-and-ipc
+spec:
+  hostPID: true 
+  hostIPC: true 
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+```
+
+2. 查看进程
+
+可以看到宿主节点的进程，如果没有配置 `hostPID` 和 `hostIPC` 时，仅可以看到 Pod 内进程。
+
+```
+ps aux 
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
