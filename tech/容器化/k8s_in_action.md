@@ -5445,6 +5445,184 @@ spec:
 ps aux 
 ```
 
+## 节点的安全上下文
+
+使用**节点**安全上下文可以应用处理一些安全问题：
+
+1. 指定容器运行进程的用户（用户 ID）；
+2. 阻止容器使用 root 用户运行（通常容器运行的用户已经在镜像中指定）；
+3. 使用特权模式运行容器，此时容器对宿主节点的内核拥有完全访问权限；
+4. 配置细粒度的内核访问权限；
+5. 设置 SELinux （Security Enhaced Linux 安全增强型 Linux），加强对容器的限制；
+6. 阻止进程写入容器的根文件系统。
+
+通常不配置安全上下文情况 Pod 启动是使用 root 来启动。Pod 内运行 `id` 进行检查，展示如下：
+
+```
+uid=0(root) gid=0(root) groups=0(root),1(bin),2(daemon),3(sys),4(adm),6(disk),10(wheel),11(floppy),20(dialout),26(tape),27(video)
+```
+
+### 指定用户运行 Pod 
+
+如果指定用户运行 Pod 需要配置 `spec.containers.securityContext.runAsUser`。id = 405 对应 guest 用户。
+
+```
+vim pod-as-user-guest.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-as-user-guest
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+    securityContext: 
+      runAsUser: 405 
+```
+
+运行 `id` 命令，展示如下：
+
+```
+uid=405(guest) gid=100(users) groups=100(users)
+```
+
+### 阻止 root 用户运行 
+
+如果不关心是否某个用户运行，只是希望阻止 root 用户运行。虽然 Pod 的命名空间是独立并与宿主节点隔离，如果 Pod 使用 root 用户运行时，当宿主节点的目录挂在到容器内，该容器就拥有目录的完整访问权限。非 root 用户则没有完整权限。
+
+配置 `spec.containers.securityContext.runAsNonRoot` 阻止 root 运行。
+
+```
+vim pod-run-as-non-root.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-run-as-non-root 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+    securityContext: 
+      runAsNonRoot: true  
+```
+
+如下，Pod 启动不成功，可以防止通过镜像攻击。因为即使镜像配置了 root 运行，Pod 也会启动不成功。
+
+```
+container has runAsNonRoot and image will run as root (pod: "pod-run-as-non-root_default(a44a7449-f3d6-4932-ba4f-5640fb7607d0)", container: main)
+```
+
+### 特权模型运行 Pod 
+
+配置 `spec.containers.securityContext.privileged` Pod 在特权模式下运行。
+
+```
+vim pod-privileged.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-privileged 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+    securityContext: 
+      privileged: true  
+```
+
+与非特权 Pod 对比，使用命令 `ls /dev` ，特权 Pod 可以看到更多的挂在设备。 
+
+### Pod 添加/禁用内核功能
+
+添加、禁用内核功能都可以更细粒度控制运行 Pod 的权限。
+
+> 添加了 SYS_TIME 功能
+
+```
+vim pod-add-settime-capability.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-add-settime-capability 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+    securityContext: 
+      capabilities: 
+        add: 
+        - SYS_TIME   
+```
+
+> 禁用 CAP_CHOWN 权限
+
+默认情况下容器拥有 `CAP_CHOWN` 权限，允许进程修改⽂件系统中⽂件的所有者。我们可以禁用该权限。
+
+```
+vim pod-add-settime-capability.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-add-settime-capability 
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+    securityContext: 
+      capabilities: 
+        drop: 
+        - CHOWN    
+```
+
+### 阻止容器写入根文件系统 
+
+以下 Pod 是以 root 用户运行，但是不能写入根文件系统，只有读权限，但是对于挂在的卷读写是允许的。
+
+```
+vim pod-with-readonly-filesystem.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-readonly-filesystem  
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["sleep", "9999999"] 
+    securityContext: 
+	  readOnlyRootFilesystem: true 
+	volumeMounts: 
+	- name: my-volume 
+	  mountPath: /volume 
+	  readOnly: false 
+  volumes: 
+  - name: my-volume 
+    emptyDir: 
+```
+
+- 测试 
+
+```
+kubectl exec -it pod-with-readonly-filesystem -- touch /new-file
+kubectl exec -it pod-with-readonly-filesystem -- touch /volume/new-file
+kubectl exec -it pod-with-readonly-filesystem -- ls -la /volume/new-file
+```
+
+
+
+
+
 
 
 
