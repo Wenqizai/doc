@@ -19,9 +19,17 @@
 
 ## 问题案例收集
 
-1.  `kubectl get cs` 发现 unhealth。
+>  `kubectl get cs` 发现 unhealth。
 
 [kubernetes - Kubectl connectivity issue - Stack Overflow](https://stackoverflow.com/questions/54608441/kubectl-connectivity-issue)
+
+> CPU request 和 limit 真的理解了么？
+
+案例：计算请求很慢，观察 Granfa CPU 却没有达到 request 和 limit。有可能存在信号重叠，granfa 取样周期和 cpu 的周期不一致造成迷惑。
+
+考虑 CPU 被限流的情况。
+
+[k8s CPU limit和throttling的迷思 · nanmu42](https://nanmu.me/zh-cn/posts/2021/myth-of-k8s-cpu-limit-and-throttle/)
 
 # 介绍
 
@@ -5727,4 +5735,150 @@ spec:
         matchLabels: 
           app: database  
 ```
+
+# 计算资源 
+
+## 申请资源 
+
+Pod 中资源主要是容器对 CPU 和内存的资源请求量 `requests` 和资源限制量 `limits`。主要此资源定义**不是针对某一个 Pod，而是容器**。
+
+**Requests**：是给调度器看的，确保 Pod 能够被调度到有足够资源的节点。
+**Limits**：是给 Kubelet 看的，确保容器不会消耗超过设定的资源量，并在资源紧张时根据 QoS 等级进行驱逐。
+### Requests 
+
+如下容器申请 200/1000 = 1/5 核 CPU 核心，内存为 10 MB。
+
+```
+vim requests-pod.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: requests-pod  
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["dd", "if=/dev/zero", "of=/dev/null"] 
+    resources: 
+      requests: 
+        cpu: 200m
+        memory: 10Mi 
+```
+
+### 调度
+
+调度器不关心实际 Pod 的使用量，而是关注 Pod 定义的 requests 定义大小。
+
+![](调度器根据requests进行调度.png)
+
+**调度函数**
+
+除了 **requests**，调度器会根据配置的调度函数进行调度：
+
+- LeastRequestedPriority：最少请求量优先调度
+- MostRequestedPriority：最大请求量优先调度  
+
+**查看资源使用情况**
+
+```
+1. 使用插件查看 resource-capacity
+kubectl resource_capacity -u -p
+kubectl resource_capacity -u -p -n <namespace>
+
+2. 使用 describe 
+kubectl describe nodes 
+```
+
+### 超额的 CPU
+
+假如 Pod 仅仅设置了 CPU 的 `requests`，没有设置 `limits`。当 CPU 资源还有剩余时，将会影响到剩下的 CPU 资源分配。
+
+对于内存则没有这方面的影响，因为内存是占用型，不会超额使用。
+
+> 可超额的 CPU 
+
+假如设置 CPU 的 requests，PodA = 200 m, PodB = 1000 m, PodA / PodB = 1/5。则会存在以下影响：
+1. 集群中只有 PodA 在使用 CPU，其他 Pod 都在空闲状态，那么 PodA 可以使用节点的 100% CPU，直到其他 Pod 的加入才会让出 CPU 的使用；
+2. 集群中只有 PodA 和 PodB 使用 CPU，那么 PodA 可以使用 200 m，PodB 可以使用 1000 m，剩下的 800 m CPU 也可以按照 1/5 的比例分配给 PodA 和 PodB。（也就是说最终的 CPU 占用比例也是 1 / 5）
+
+**注意：** 防止单 Pod 死循环耗尽节点的 CPU 资源，最佳实践需要设置 CPU 的 limits。但也需要注意 limits 太小，CPU 被限流，应用请求延迟；太大耗费资源量就大。
+
+最佳实践，设置 limits 为不超过节点核心数的 2 / 3。
+
+![](CPU的超额使用.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
