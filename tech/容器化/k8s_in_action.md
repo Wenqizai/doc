@@ -5766,7 +5766,7 @@ spec:
         memory: 10Mi 
 ```
 
-### 调度
+#### 调度
 
 调度器不关心实际 Pod 的使用量，而是关注 Pod 定义的 requests 定义大小。
 
@@ -5790,7 +5790,7 @@ kubectl resource_capacity -u -p -n <namespace>
 kubectl describe nodes 
 ```
 
-### 超额的 CPU
+#### 超额的 CPU
 
 假如 Pod 仅仅设置了 CPU 的 `requests`，没有设置 `limits`。当 CPU 资源还有剩余时，将会影响到剩下的 CPU 资源分配。
 
@@ -5807,6 +5807,68 @@ kubectl describe nodes
 最佳实践，设置 limits 为不超过节点核心数的 2 / 3。
 
 ![](CPU的超额使用.png)
+
+### Limits 
+
+对于 CPU 的 Limits，单个 Pod 不配置 Limits 可以用来实现一些 CPU 的超额需求，只要不影响 Pod 之间的 CPU 资源恶性竞争就不会产生不利影响。
+
+对于内存的 Limits，如果不加以限制，单个 Pod 可以耗尽节点上的内存资源，直到进程释放内存。内存竞争占用对其他 Pod 影响是致命的。因此，很有必要限制 Pod 的最大内存分配量。
+
+```
+vim limited-pod.yaml 
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: limited-pod  
+spec:
+  containers:
+  - image: 192.168.5.5:5000/library/alpine/curl:8.8.0   
+    name: main 
+    command: ["dd", "if=/dev/zero", "of=/dev/null"] 
+    resources: 
+      requests: 
+        cpu: 1
+        memory: 20Mi 
+```
+
+#### 超额的 Limits 
+
+注意这里与超额的 CPU 是不一样的概念。超额的 CPU 是针对节点剩余可使用的 CPU 进行超额。而超额的 Limits 是针对设置 Pod 资源限制的超额。
+
+因为超额的 Limits 不会影响到节点的调度，但是会影响到资源的竞争、Pod 的监控、引发驱逐 QoS 驱逐 Pod 等。
+
+![](节点超额的Limits.png)
+
+#### 超过 Limits 
+
+**对于 CPU**
+
+容器分配的 CPU 不会超过 Limits 限制的 CPU。
+
+**对于内存**
+
+当容器进程申请内存超过 Limits，该容器会被 OOMKilled。当容器被 OOMKilled 后会重启，内存被释放。（超过了 livenessProbe 探针检查后容器也会被重启）
+
+## 风险项
+
+容器内看到的资源是节点的资源，因此设置的 `requests` 和 `limits` 也是节点的资源，不是容器本身的资源。
+
+**Java 应用**
+
+> 内存
+
+如果不设置 -Xmx，JVM 默认采用的堆内存将是节点内存来决定堆的大小。如果在大内存的物理机设置容器的 limits，容器启动时申请的内存超过 Limits 导致 Pod 被反复 kill 和重启。
+
+> CPU 
+
+Java 应用获取到的 CPU 的核心也是节点的核心。如果应用依赖获取系统核心数来创建线程，在多核的节点上将会创建大量的线程。
+
+而 limits，只会限制应用使用 CPU 核心的时间，不会限制分配给 Java 应用看到的 CPU 核心数。
+
+**注意：** Java 8u131 版本加入了容器内存限制感知，Java 9 加入了容器 CPU 感知。
+
+
 
 
 
