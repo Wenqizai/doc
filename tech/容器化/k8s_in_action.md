@@ -31,6 +31,80 @@
 
 [k8s CPU limit和throttling的迷思 · nanmu42](https://nanmu.me/zh-cn/posts/2021/myth-of-k8s-cpu-limit-and-throttle/)
 
+### Pod 压力驱逐
+
+[节点压力驱逐 | Kubernetes](https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/node-pressure-eviction/#eviction-signals)
+
+总结：通常 kubelet 不会因为 CPU 压力而驱逐 Pod，但是 Pod 之间资源竞争激烈，导致 Pod 性能下架，livenessProbe 探测不成功而被重启或驱逐 Pod。
+
+其中驱逐有软驱逐和硬驱逐，软驱逐会等待一段时间后才会驱逐相关 Pod。使用软驱逐可以很好应对系统突发毛刺情况。
+
+以下引用 DeepSeek R1 的思考：
+
+```markdown
+Kubernetes **不会直接因CPU资源不足而驱逐Pod**，但会根据资源分配机制对Pod进行限制。以下是详细说明：
+
+---
+
+### 1. **CPU资源不足的处理机制**
+
+- **可压缩资源特性**：CPU属于可压缩资源，当资源不足时，Kubernetes会通过`CFS（Completely Fair Scheduler）`限制容器的CPU使用时间片，导致Pod性能下降（如响应变慢），但不会直接杀死或驱逐Pod。
+    
+- **资源请求（Request）与限制（Limit）**：
+    
+    - **Request**：Pod申请的最低保障资源。调度器（kube-scheduler）会确保节点剩余资源满足Pod的Request后才会调度。
+        
+    - **Limit**：Pod能使用的资源上限。超过Limit时，容器进程可能被`Throttled`（限制CPU时间片），但不会被终止。
+        
+
+---
+
+### 2. **驱逐（Eviction）的触发条件**
+
+Kubernetes的驱逐机制主要针对**不可压缩资源**（如内存、磁盘）：
+
+- **内存不足（MemoryPressure）**：节点可用内存低于阈值时，kubelet按优先级驱逐Pod。
+    
+- **磁盘不足（DiskPressure）**：节点磁盘（或镜像存储空间）不足时触发驱逐。
+    
+- **PID不足**（较少见）。
+    
+
+> 📌 **关键点**：CPU不足不会直接触发驱逐，但内存或磁盘不足会。
+
+---
+
+### 3. **间接影响场景**
+
+虽然CPU不足不直接驱逐Pod，但可能导致以下问题：
+
+- **节点不健康**：长期CPU资源竞争可能使节点关键组件（如kubelet）无法正常运行，导致节点被标记为`NotReady`，进而触发Pod重新调度。
+    
+- **服务质量（QoS）降级**：若Pod的CPU使用超过Limit，可能被持续限制，导致业务延迟升高。
+    
+
+---
+
+### 4. **配置建议**
+
+- **合理设置Request/Limit**：避免Request过低导致节点资源超卖。
+    
+- **监控与自动扩缩**：
+    
+    - 使用`Horizontal Pod Autoscaler（HPA）`根据负载自动扩缩Pod副本。
+        
+    - 使用`Cluster Autoscaler`自动扩容节点。
+        
+- **优先级与抢占**：通过`PriorityClass`配置Pod优先级，确保关键服务在资源紧张时优先保留。
+    
+
+---
+
+### 总结
+
+Kubernetes不会因CPU不足直接驱逐Pod，但会限制其性能。内存或磁盘不足才是驱逐的主要原因。合理规划资源请求、监控集群状态，并结合自动扩缩策略，是保障服务稳定的关键
+```
+
 # 介绍
 
 Kubernetes，希腊语，领航员、舵手的意思。
@@ -5868,7 +5942,9 @@ Java 应用获取到的 CPU 的核心也是节点的核心。如果应用依赖�
 
 **注意：** Java 8u131 版本加入了容器内存限制感知，Java 9 加入了容器 CPU 感知。
 
+## QoS 等级
 
+Qos 等级，Quality of Service，主要用来处理当节点上设置 Limits 超过节点资源，当 Pod 申请更多的资源，如内存、磁盘等，而节点不能够满足资源申请。Kubelet 会按照 QoS 等级来驱逐相关 Pod。
 
 
 
