@@ -5944,13 +5944,85 @@ Java 应用获取到的 CPU 的核心也是节点的核心。如果应用依赖�
 
 ## QoS 等级
 
-Qos 等级，Quality of Service，主要用来处理当节点上设置 Limits 超过节点资源，当 Pod 申请更多的资源，如内存、磁盘等，而节点不能够满足资源申请。Kubelet 会按照 QoS 等级来驱逐相关 Pod。
+Qos 等级，Quality of Service，主要用来处理当节点上设置 Limits 超过节点资源，当 Pod 申请更多的资源，如内存、磁盘等，而节点不能够满足资源申请。Kubelet 会按照 QoS 等级来驱逐相关 Pod。等级共分为：
+
+- **BestEffort**：优先级最低
+- **Burstable**：优先级中等
+- **Guaranteed**：优先级最高
+
+### 定义 QoS 等级
+
+QoS 等级并不是由单独字段指定维护，而是来源于 Pod 所包含的容器的资源 requests 和 limits 配置。
+#### BestEffort
+
+<font color="#e36c09">BestEffort 等级，分配给容器没有设置任何 requests 和 limits 的 Pod。</font>
+
+最坏情况，这些 Pod 分不到任何 CPU 时间，同时节点内存不足时，该批 Pod 会第一批被杀死。如果节点运行良好时，这些容器将会使用更多的 CPU 和内存。
+#### Guaranteed
+
+<font color="#e36c09">Guaranteed 等级，分配给容器设置任何 requests 和 limits 相等的 Pod。</font>
+
+必要条件：
+1. CPU 和内存都要设置 requests 和 limits；
+2. 每个容器都需要设置资源量；
+3. `requests` 等于 `limits`。
+#### Burstable 
+
+<font color="#e36c09">Burstable 等级，介于 BestEffort 等级和 Guaranteed 等级之间。</font>
+
+包括以下情景：
+1. `requests ` 不等于 ` limits ` ；
+2. Pod 内包含多个容器，如果有一容器没有都设置 `requests` 和 `limits`，或者两者不相等。
+
+![|400](requests和limits与QoS等级示意图.png)
+
+![](基于requests和limits的单容器QoS等级.png)
+
+### 多容器的 Pod QoS 等级
+
+Pod 内有多个容器时，Pod 的 QoS 等级可以由所有的容器 QoS 等级推断出来。
+
+1. 所有容器的 QoS 等级都相等，那么该容器的 Qos 等级就是 Pod 的 QoS 等级；
+2. 当有一容器的 QoS 等级不一样时，那么 Pod 的 QoS 等级就是 Burstable 等级。 
+
+![](多容器的Pod%20Qos%20等级.png)
+
+### 驱逐 Pod 
+
+当节点压力不足时，驱逐 Pod 的顺序是 BestEffort、Burstable 和 Guaranteed。可以通过以下命令查看 Pod 的 Qos 等级。 
+
+```
+kubectl describe po <podName>
+
+# 该字段描述
+QoS Class: BestEffort
+```
+
+**注意：** Pod 的 Qos 等级不是 kubectl 直接依据，因为还有临时存储（EphemeralStorage）和 `DiskPressure` 等因素来驱逐 Pod。具体参考文档：
+
+[节点压力驱逐 | Kubernetes](https://kubernetes.io/zh-cn/docs/concepts/scheduling-eviction/node-pressure-eviction/#eviction-signals)
+
+```
+说明：
+
+kubelet 不使用 Pod 的 [QoS 类](https://kubernetes.io/zh-cn/docs/concepts/workloads/pods/pod-qos/)来确定驱逐顺序。 在回收内存等资源时，你可以使用 QoS 类来估计最可能的 Pod 驱逐顺序。 QoS 分类不适用于临时存储（EphemeralStorage）请求， 因此如果节点在 `DiskPressure` 下，则上述场景将不适用。
+```
+
+> 相同 Qos 等级，谁被先驱逐？
+
+每个运行的进程都会计算一个 OOM 分数值，当需要 OOM Killed 时，分数值最高的进程优先被杀掉。
+
+OOM 分数计算参数：
+
+1. 进程已消耗内存占可用内存的百分比；
+2. 基于 Pod Qos 等级和容器内存申请量固定的 OOM 分数调节因子（`spec.containers.my-container.OOMScoreAdj`）。
+
+如图，PodB 比 PodC 先被驱逐是因为 PodB 已使用的内存占比更高。
+
+![|425](Pod被驱逐的顺序.png)
 
 
-
-
-
-
+**Note：** 使用 `oomd` 插件可以查看最接近 OOMKilled 的 Pod。因此优秀的工程师应当着重关注 Pod 实际消耗的内存，设置合适的 reqeusts 和 limits。
 
 
 

@@ -612,6 +612,13 @@ kubectl resource_capacity -u -p
 kubectl resource_capacity -u -p -n <namespace>
 ```
 
+### oomd
+
+查看最接近 OOMKilled 的 Pod。
+
+```
+kubectl krew install oomd
+```
 
 
 
