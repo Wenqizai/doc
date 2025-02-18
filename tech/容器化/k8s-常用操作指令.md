@@ -492,6 +492,13 @@ kubectl create sa
 kubectl create role/clusterrole
 kubectl create rolebinding/clusterrolebinding <bindingName> --role/clusterrole=<roleName> --serviceaccount=<namespace:saName>
 ```
+
+# LimitRange 
+
+```
+kubectl get limitrange -n <namespace>
+kubectl describe limitrange <name> -n <namespace>
+```
 # 插件
 
 ## Krew 

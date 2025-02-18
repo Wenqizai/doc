@@ -6024,12 +6024,62 @@ OOM 分数计算参数：
 
 **Note：** 使用 `oomd` 插件可以查看最接近 OOMKilled 的 Pod。因此优秀的工程师应当着重关注 Pod 实际消耗的内存，设置合适的 reqeusts 和 limits。
 
+### LimitRange
 
+借助 LimitRange 资源，可以创建默认的 requests 和 limits，避免每个去配置容器。
 
+LImitRange 可以根据 <font color="#f79646">Pod，Container 或 PersistentVolumeClaim</font> 来创建不同的资源指定值。
 
+其中包括：
 
+- `min`：最小值
+- `max`：最大值 
+- `defaultRequest`：默认的 requests 
+- `default`：默认的 limits 
+- `maxLimitRequestRatio`：requests 与 limits 的最大比例。
 
+**注意：** LimitRange 是在 Pod、Container 或 PVC <font color="#f79646">创建时进行的校验</font>，不通过则拒绝或赋默认值。当资源已经创建之后修改 requests 和 limits 则不会再进行校验。
 
+```
+vim limitrange-example.yaml 
+
+apiVersion: v1
+kind: LimitRange 
+metadata:
+  name: limitrange-example  
+spec:
+  limits: 
+  - type: Pod 
+    min: 
+      cpu: 50m
+      memory: 5Mi
+    max: 
+      cpu: 1 
+      memory: 100Mi
+  - type: Container 
+    defaultRequest: 
+      cpu: 100m 
+      memory: 10Mi
+    default: 
+      cpu: 200m 
+      memory: 10Mi
+    min: 
+      cpu: 50m
+      memory: 5Mi
+    max: 
+      cpu: 1 
+      memory: 100Mi
+    maxLimitRequestRatio: 
+      cpu: 4 
+      memory: 10 
+  - type: PersistentVolumeClaim  
+    min: 
+      storage: 200Mi
+    max: 
+      storage: 300Mi
+```
+
+![|500](LimitRange示意图.png)
 
 
 
