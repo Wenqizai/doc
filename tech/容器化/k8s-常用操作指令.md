@@ -499,6 +499,13 @@ kubectl create rolebinding/clusterrolebinding <bindingName> --role/clusterrole=<
 kubectl get limitrange -n <namespace>
 kubectl describe limitrange <name> -n <namespace>
 ```
+
+# ResourceQuota 
+
+```
+kubectl get quota -n <namespace>
+kubectl describe quota <name> -n <namespace>
+```
 # 插件
 
 ## Krew 

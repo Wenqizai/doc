@@ -6024,7 +6024,7 @@ OOM 分数计算参数：
 
 **Note：** 使用 `oomd` 插件可以查看最接近 OOMKilled 的 Pod。因此优秀的工程师应当着重关注 Pod 实际消耗的内存，设置合适的 reqeusts 和 limits。
 
-### LimitRange
+## LimitRange
 
 借助 LimitRange 资源，可以创建默认的 requests 和 limits，避免每个去配置容器。
 
@@ -6081,11 +6081,37 @@ spec:
 
 ![|500](LimitRange示意图.png)
 
+## ResourceQuota 
 
+LimitRange 是应用于单个 Pod、Container 或 PVC，还是无法避免大量创建该类资源耗尽节点资源的场景。
 
+ResurceQuota 就是用于限制命名空间可用资源总量的手段。ResourceQuota 在资源创建时就会检查该命名空间现有资源是否超过 ResurceQuota 的定义，超过则拒绝创建。
 
+因为创建有先后，ResurceQuota 的创建不会对现有资源造成影响，只会对新创建的有影响。<font color="#f79646">ResourceQuota 的创建必须有 LimitRange 的前提下。</font> 因为有了 LimitRange 才能计算每个资源的 requests 和 limits。
 
+```
+vim quota-cpu-memory.yaml
 
+apiVersion: v1
+kind: ResourceQuota 
+metadata:
+  name: cpu-and-mem   
+spec: 
+  hard: 
+    requests.cpu: 400m 
+    requests.cpu: 200Mi
+	limits.cpu: 600m 
+	limits.memory: 500Mi
+```
+
+![](limitrange和resourcequota的作用域.png)
+
+### 特定资源 ResourceQuota 
+
+ResourceQuota 除了粗粒度限制命名空间的资源量，同时还支持一些细粒度的的资源总量限制。如：
+
+- 限制资源的总个数，如 10 个 Pod，10 个 svc 等；
+- 特定范围的资源指定配额，如按 Pod 状态划分、按 QoS 等级划分。
 
 
 
