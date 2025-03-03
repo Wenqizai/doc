@@ -6113,6 +6113,25 @@ ResourceQuota 除了粗粒度限制命名空间的资源量，同时还支持一
 - 限制资源的总个数，如 10 个 Pod，10 个 svc 等；
 - 特定范围的资源指定配额，如按 Pod 状态划分、按 QoS 等级划分。
 
+## 监控资源
+
+集群中执行相关命令可以查看相关资源信息：
+
+```
+kubectl top node 
+kubectl top pod 
+```
+
+目前主流的监控方案是：Prometheus + grafana。Prometheus 负责监控数据的收集，grafana 负责数据的可视化和告警通知。
+
+
+[监控 · Kubernetes Handbook](https://feisky.xyz/kubernetes-handbook/addons/monitor.html)
+
+
+
+
+
+
 
 
 
