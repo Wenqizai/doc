@@ -6149,6 +6149,71 @@ kubectl top pod
 | **适用负载** | 突发流量、无状态服务 | 资源需求波动大、有状态服务   |
 | **响应速度** | 快速（秒级）     | 较慢（需Pod重启/节点替换） |
 | **资源效率** | 按需分配实例     | 精细化资源分配         |
+## HPA 
+
+HPA，HorizontalpodAutoscaler 资源控制器，可以周期检查 Pod，以调整目标资源的副本数。
+
+实现自动伸缩的三个步骤：
+
+1. 获取 Pod 的度量；
+2. 计算目标 Pod 的数量；
+3. 修改 replicas 字段。 
+
+![|450](HPA流程.png)
+
+### 基于 CPU 使用率
+
+CPU 是不稳定的，通常靠谱的做法在 CPU 100% 时进行纵向扩容。还有一种取巧方法是配置节点的 CPU 的 limits 为 90%，预留 10% 来横向扩容来应急流量的洪峰。
+
+> Demo 
+
+```
+vim cpu-pod-deployment.yaml 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kubia-cpu  
+spec:
+  replicas: 3 
+  selector:
+    matchLabels:
+      app: kubia
+  template: 
+    metadata: 
+      name: kubia 
+      labels: 
+        app: kubia 
+    spec:  
+	  containers:
+	  - image: 192.168.5.5:5000/library/luksa/kubia-pet 
+	    name: nodejs 
+	    resources: 
+	      requests: 
+	        cpu: 100m
+```
+
+- 创建 HPA 
+
+```
+kubectl autoscale deployment kubia-cpu --cpu-percent=30 --min=1 --max=5
+
+# 查看 
+kubectl get hpa kubia-cpu -o yaml 
+```
+
+### 基于自定义指标
+
+1. 基于内存，通常基于内存的 Pod 横向扩容是困难的，毕竟内存不会预留太大，其他 Pod 并不会在伸缩过程自动释放内存。
+
+2. 基于 metrics 的度量，如资源数量，Pod QPS 等。主要还是需要解决度量问题。
+
+## VPA
+
+
+
+
+
 
 
 
