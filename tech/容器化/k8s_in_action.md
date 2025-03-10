@@ -6210,6 +6210,23 @@ kubectl get hpa kubia-cpu -o yaml
 
 ## VPA
 
+# 高级调度
+
+高级调度是利用<font color="#f79646">节点污点</font>和 <font color="#f79646">Pod 的容忍度</font>来调度 Pod 到不同的节点，相当于是标签选择器的补充。
+
+## 节点污点与 Pod 污点容忍度
+
+节点污点 Taint：拒绝 Pod 到节点上的部署。
+Pod 污点容忍度 Toleration：容忍 Pod 调度相同污点的节点上。
+
+<font color="#f79646">节点污点与 Pod 污点容忍度是匹配的</font>，如下。Master 的污点是 ` node.kubernetes.io/unreachable:NoExecute`，只能接受容忍度是 ` node.kubernetes.io/unreachable:NoExecute` 的 Pod 调度到该节点。
+
+![|425](节点污点与Pod容忍度调度.png)
+
+可以通过 `kubectl describe` 指令来查看相关节点污点或 Pod 污点容忍度。
+
+
+
 
 
 
