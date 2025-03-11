@@ -6225,13 +6225,65 @@ Pod 污点容忍度 Toleration：容忍 Pod 调度相同污点的节点上。
 
 可以通过 `kubectl describe` 指令来查看相关节点污点或 Pod 污点容忍度。
 
+### 节点污点效果
 
+#### NoSchedule
 
+如果 Pod 没有容忍这些污点，那么该 Pod <font color="#f79646">不能调度</font>到包含这些污点的节点上。
 
+#### PreferNoSchedule
 
+相对于 NoSchedule 的没有容忍一定会拒绝调度，PreferNoSchedule<font color="#f79646"> 当 Pod 没有其他节点可以调度时，该节点也会接受该 Pod 的调度</font>。
 
+#### NoExecute
 
+NoExecute 是针对正在运行的 Pod。<font color="#f79646">如果正在运行的 Pod 没有节点污点的容忍度，那么该 Pod 会被节点摘除</font>。
 
+### 定义节点污点
+
+- 添加节点污点
+
+```
+kubectl taint node k8snode1 node-type=production:NoSchedule 
+```
+
+- 查看无污点容忍度的 Pod 调度情况
+
+```
+kubectl create deployment test-taints --image 192.168.5.5:5000/library/busybox:1.36 --replicas 5 -- sleep 99999
+```
+
+### 定义 Pod 污点容忍度
+
+- 添加 Pod 污点容忍度，观察 Pod 的调度 
+
+```
+vim pod-toleration-deployment.yaml 
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: test-toleration  
+spec:
+  replicas: 5  
+  selector:
+    matchLabels:
+      app: kubia
+  template: 
+    metadata: 
+      name: test-toleration 
+      labels: 
+        app: kubia 
+    spec:  
+	  containers:
+	  - image: 192.168.5.5:5000/library/busybox:1.36 
+	    name: test-toleration 
+	  tolerations: 
+	  - key: node-type 
+	    operator: Equal 
+	    value: production 
+	    effect: NoSchedule 
+```
 
 
 

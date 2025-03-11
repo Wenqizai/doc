@@ -506,6 +506,21 @@ kubectl describe limitrange <name> -n <namespace>
 kubectl get quota -n <namespace>
 kubectl describe quota <name> -n <namespace>
 ```
+
+# 污点&容忍度
+
+```
+# 查看节点容忍度
+kubectl describe nodes | grep -i taints 
+
+# 查看 Pod 污点容忍度
+kubectl describe pod <pod-name> | grep -i tolerations
+
+# 添加节点污点
+kubectl taint node <nodeName> <labelName>
+
+# 
+```
 # 插件
 
 ## Krew 
