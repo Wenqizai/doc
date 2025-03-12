@@ -6257,6 +6257,8 @@ kubectl create deployment test-taints --image 192.168.5.5:5000/library/busybox:1
 
 - 添加 Pod 污点容忍度，观察 Pod 的调度 
 
+可以发现 Pod 可以调度到没有设置污点的节点上，要避免这个问题需要对所有的节点设置相应的 `node-type` 污点。
+
 ```
 vim pod-toleration-deployment.yaml 
 
@@ -6278,12 +6280,81 @@ spec:
 	  containers:
 	  - image: 192.168.5.5:5000/library/busybox:1.36 
 	    name: test-toleration 
+     	command: ["sleep", "9999999"] 
 	  tolerations: 
 	  - key: node-type 
 	    operator: Equal 
 	    value: production 
 	    effect: NoSchedule 
 ```
+
+## 亲缘性
+
+节点污点 Taints，让 Pod 远离该节点。节点亲缘性 nodeAffinity，让 Pod 只调度到该节点。有点像 nodeSelector，不过这个功能更强大，nodeSelector 会被弃用。
+
+**NodeAffinity**：节点亲缘性，Pod 调度到该节点。
+**PodAffinity**: Pod 亲缘性，Pod 调度与 Pod 标签亲缘的节点。
+
+![|500](Pod带有节点亲缘性的调度.png)
+
+Pod 的亲缘性也是依赖于 Node 的 Label。有了节点亲缘性，就可以规划节点 region，打上对应的 Label，把 Pod 部署到优先的 region 节点上。
+
+### Node 亲缘性
+
+设置相应的 weight，可以让 Pod 优先调度到对应的节点 Node。 
+
+**注：** weight 不是影响调度的唯一因素，调度器有调度的优先级函数，决定 Pod 的调度是综合考量的结果。
+
+![](Pod亲缘性优先级调度.png)
+
+### Pod 亲缘性
+
+`podAffinity` 可以让 Pod 与 Pod 之间亲缘部署。如果被亲缘的 Pod 被删除，那么亲缘的 Pod 会由其他规则来决定调度。
+
+![|450](Pod之间的亲缘调度.png)
+
+PodAffinity + topology key，决定 Pod 调度的节点范围。
+
+![](Pod亲缘性与调度范围.png)
+
+同样 Pod 的亲缘性也可以调整 weight 来调度。
+### Pod 非亲缘性 
+
+PodAntiAffinity，会影响到 Pod 不会调度到对应标签的节点上。
+
+与之类似，topologyKey 同样可以影响 Pod 不能调度的范围。
+
+![](Pod非亲缘性调度.png)
+
+### 亲缘性应用
+
+1. Region 部署，同机房部署；
+2. 关联 Pod 部署，如前端与后端，微服务调用，希望它们部署到同一个节点上，降低网络 IO 时延；
+3. 利用非亲缘性调度，可以分散 Pod 调度来达到高可用。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
