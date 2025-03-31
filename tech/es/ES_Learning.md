@@ -833,6 +833,71 @@ PUT /website/blog/1?version=2&version_type=external
 
 ```
 
+##### 文档更新或更新插入
+
+> Update 方式
+
+- Update：更新文档，如果文档不存在，则会报错。**仅更新指定字段**。
+- Upsert：存在则更新，不存在则创建，通过属性 `doc_as_upsert` 来指定。 
+
+```shell
+# 查看
+
+GET /website/blog/22
+
+# update 
+POST /website/blog/22/_update
+{
+    "script": {
+        "source": "ctx.op = ctx._source.views == params.count ? 'delete' : 'none'",
+        "params": {
+            "count": 1
+        }
+    }
+}
+
+
+# upsert 
+POST /website/_update/22?retry_on_conflict=3
+{
+    "doc": {
+        "title": "My first blog entry version 2",
+        "text": "Starting to get the hang of this...  version 2",
+        "views": 1,
+        "tags": [
+            "testing-覆盖",
+            "search"
+        ]
+    },
+    "doc_as_upsert": true
+}
+
+```
+
+> Index 方式
+
+Index 方式是用来创建文档，也可以是实现文档更新的功能。需要注意是
+
+**注意**： Index 对比 Update，Index 是整个文档覆盖，相当于新建文档，update 是基于指定属性更新，不是覆盖整个文档。
+
+```shell
+GET /website/blog/23
+
+PUT /website/blog/23
+{
+  "title": "My first blog entry => update",
+  "text":  "Just trying this out... => update",
+  "date":  "2014/01/01"
+}
+
+PUT /website/blog/23
+{
+  "title": "My first blog entry => update",
+  "date":  "2014/01/01"
+}
+```
+
+
 ##### 文档脚本更新
 对于那些 API 不能满足需求的情况，Elasticsearch 允许你使用脚本编写自定义的逻辑。默认的脚本语言是 [Groovy](http://groovy.codehaus.org/)，可以通过设置集群中的所有节点的 `config/elasticsearch.yml` 文件来禁用动态 Groovy 脚本。
 ```yml
