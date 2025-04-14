@@ -78,7 +78,8 @@ network.host: 0.0.0.0
 http.port: 9200
 discovery.seed_hosts: ["node-1", "node-2", "node-3"]
 cluster.initial_master_nodes: ["node-1"]
-bootstrap.memory_lock: true
+bootstrap.memory_lock: false
+bootstrap.system_call_filter: false
 ```
 
 ### 4. kibana/config/kibana.yml
@@ -88,6 +89,10 @@ server.name: kibana
 server.host: "0.0.0.0"
 elasticsearch.hosts: ["http://node-1:9200"]
 monitoring.ui.container.elasticsearch.enabled: true
+xpack.security.enabled: false
+xpack.monitoring.enabled: false
+xpack.watcher.enabled: false
+xpack.ml.enabled: false
 ```
 
 ## 部署步骤
