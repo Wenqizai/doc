@@ -38,3 +38,7 @@ DO NOT GIVE ME HIGH LEVEL STUFF, IF I ASK FOR FIX OR EXPLANATION, I WANT ACTUAL 
 6. API接口清单
 7. 常见的代码模式和约定
 ```
+
+# 参考文档
+
+[使用 cursor 搭建项目，最规范的流程是什么样的？ prompt 或 rules 推荐 - V2EX](https://www.v2ex.com/t/1126650#reply10)<https://www.v2ex.com/t/1126650#reply10>
