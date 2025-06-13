@@ -9,7 +9,7 @@
 **Windows**
 
 mklink /j <目标目录> <源目录>
-
+****
 ```
 mklink /j ./obsidian_soft /obsidian_repo/.obsidian
 ```
