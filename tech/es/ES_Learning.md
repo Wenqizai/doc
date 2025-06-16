@@ -2935,7 +2935,7 @@ GET /my_index/_analyze
 
 自定义的分析器虽然构建成功，但是还是没什么用处。接下来我们需要告诉 ES 在什么地方用上这个分词器才完成我们自定义分析器的功能。
 
-比如，指定索引 `my_index` 的 `title` 字段类型是 `string` 的使用自定义分析器 `analyzer`。
+比如，指定索引 `my_index` 的 `title` **字段类型是** `string` 的使用自定义分析器 `analyzer`。
 ```shell
 PUT /my_index/_mapping
 {
