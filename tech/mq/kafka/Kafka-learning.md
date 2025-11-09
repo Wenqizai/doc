@@ -3,6 +3,16 @@
 
 # 架构
 
+## 架构图
+
+### 消费者
+
+#### 位移
+
+组内消费者保存消费的位移
+
+![[消费者位移.png|300]]
+
 ## 生产者
 
 ## 消息体
@@ -94,4 +104,19 @@ return Math.abs(key.hashCode()) % partitions.size();
 
 # 实践
 
+## 消息可靠性
+
+**Producer**
+
+Kafka 的消息发送都是异步发送。要保证发送消息的可靠性，需要使用带有 callback 的 API，处理异步消息发送遇到的异常，确保消息能够发送到 Broker。
+
+```java
+public interface Producer<K, V> extends Closeable {
+	Future<RecordMetadata> send(ProducerRecord<K, V> record, Callback callback);
+}
+
+public interface Callback {
+	void onCompletion(RecordMetadata metadata, Exception exception);
+}
+```
 
