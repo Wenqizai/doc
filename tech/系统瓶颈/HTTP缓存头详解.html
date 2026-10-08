@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>HTTP 缓存层：Cache-Control 与 ETag 的生产实践</title>
+<style>
+:root {
+  --bg:#fff;--text:#24292e;--code-bg:#f6f8fa;
+  --sidebar-w:250px;--accent:#0366d6;
+  --green:#1a7f37;--red:#cf222e;--orange:#bd5b00;
+  --tbl-border:#d0d7de;--footnote:#586069;
+  --card-bg:#f8fafc;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;font-size:15px;line-height:1.7;color:var(--text);background:var(--bg);}
+body{display:flex;min-height:100vh;}
+
+/* ── Sidebar TOC ── */
+#sidebar{position:fixed;top:0;left:0;width:var(--sidebar-w);height:100vh;overflow-y:auto;background:#fafbfc;border-right:1px solid var(--tbl-border);padding:20px 16px;font-size:13px;z-index:10;}
+#sidebar h4{margin-bottom:12px;color:#656d76;font-size:11px;text-transform:uppercase;letter-spacing:.8px;}
+#sidebar ul{list-style:none;padding-left:6px;}
+#sidebar li{margin-bottom:5px;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#sidebar a{color:var(--accent);text-decoration:none;font-size:13px;}
+#sidebar a:hover{text-decoration:underline;cursor:pointer;}
+#sidebar ul ul{padding-left:12px;border-left:1px solid #e8e8e8;margin-left:-6px;}
+
+/* ── Content ── */
+#content{margin-left:var(--sidebar-w);padding:40px 56px;max-width:860px;width:calc(100vw - var(--sidebar-w));}
+h1{font-size:26px;border-bottom:1px solid var(--tbl-border);padding-bottom:10px;margin-bottom:20px;}
+h2{font-size:21px;margin-top:34px;margin-bottom:14px;padding-bottom:6px;border-bottom:1px solid #eaecef;}
+h3{font-size:16px;margin-top:20px;margin-bottom:8px;}
+p{margin-bottom:14px;text-align:justify;}
+
+/* Code */
+code{background:var(--code-bg);padding:1px 5px;border-radius:3px;font-size:13.5px;}
+pre{background:var(--code-bg);padding:14px;border-radius:6px;overflow-x:auto;margin:12px 0;font-size:13px;line-height:1.5;}
+pre code{background:none;padding:0;font-size:inherit;color:#24292e;}
+
+/* Tags */
+.tag{display:inline-block;padding:2px 10px;border-radius:4px;font-size:12px;margin-right:5px;}
+.tag-green{background:#e6ffec;color:var(--green);border:1px solid #34d058;}
+.tag-red{background:#ffeef0;color:var(--red);border:1px solid #fdaeb7;}
+.tag-blue{background:#ddf4ff;color:var(--accent);border:1px solid #54aeff;}
+
+/* Highlight cells */
+.hl-before{color:var(--red);font-weight:700;background:#fff1f2;padding:2px 6px;border-radius:3px;}
+.hl-after{color:var(--green);font-weight:700;background:#f0fdf4;padding:2px 6px;border-radius:3px;}
+
+/* Collapsible details */
+details{border:1px solid var(--tbl-border);border-radius:8px;margin:14px 0;background:var(--card-bg);box-shadow:var(--shadow);}
+details summary{padding:11px 16px;cursor:pointer;font-weight:600;background:#f6f8fa;border-radius:8px;user-select:none;font-size:14px;}
+details summary:hover{background:#eef2f4;}
+details[open] summary{border-bottom:1px solid var(--tbl-border);border-radius:8px 8px 0 0;background:#eef2f4;}
+details .content{padding:16px;font-size:14px;line-height:1.7;}
+
+/* SVG diagrams */
+.svg-diagram{margin:20px 0;border:1px solid var(--tbl-border);border-radius:8px;padding:12px;background:#fff;box-shadow:var(--shadow);}
+.svg-diagram svg{width:100%;height:auto;}
+
+/* Cards (golden rules) */
+.card-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0;}
+.card{background:#fff;border:1px solid var(--tbl-border);border-radius:8px;padding:16px;box-shadow:var(--shadow);}
+.card .card-title{font-weight:700;font-size:15px;margin-bottom:6px;color:#24292e;}
+.card .card-desc{font-size:13px;color:#656d76;}
+.card-icon{float:left;width:40px;height:40px;margin-right:10px;}
+
+/* Charts */
+.chart-bar{display:flex;align-items:center;margin:6px 0;font-size:13px;}
+.chart-label{width:150px;text-align:right;padding-right:12px;font-size:13px;flex-shrink:0;}
+.chart-track{height:22px;background:#f6f8fa;border-radius:4px;flex-grow:1;margin-right:8px;overflow:hidden;}
+.chart-fill{height:100%;border-radius:4px;display:flex;align-items:center;padding-left:8px;color:#fff;font-size:12px;font-weight:600;}
+.fill-red{background:linear-gradient(90deg,#fdaeb7,#f85149);}
+.fill-green{background:linear-gradient(90deg,#34d058,var(--green));}
+
+/* Before/After table */
+table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px;}
+th,td{border:1px solid var(--tbl-border);padding:8px 10px;text-align:left;vertical-align:middle;}
+th{background:#f6f8fa;font-weight:600;white-space:nowrap;}
+
+/* strategy decision table */
+.strat-row{display:flex;border-bottom:1px solid var(--tbl-border);padding:10px 0;align-items:center;}
+.strat-type{width:130px;font-weight:600;flex-shrink:0;}
+.strat-desc{font-size:13px;}
+
+footer{margin-top:50px;padding-top:16px;border-top:1px solid var(--tbl-border);font-size:13px;color:var(--footnote);}
+
+@media (max-width:800px){
+  body{display:block;}
+  #sidebar{position:relative;width:auto;height:auto;max-height:35vh;overflow-y:auto;border-right:0;border-bottom:1px solid var(--tbl-border);padding:14px 20px;}
+  #sidebar li{white-space:normal;overflow:visible;text-overflow:clip;}
+  #content{width:100%;max-width:none;margin-left:0;padding:24px 20px;}
+  #content svg{display:block;max-width:100%;height:auto;}
+  p{text-align:left;}
+}
+
+@media (max-width:600px){
+  h1{font-size:23px;}
+  .card-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════ SIDEBAR TOC ═══════ -->
+<nav id="sidebar">
+  <h4>目录</h4>
+  <ul>
+    <li><a onclick="scrollTo('#s1')">§1 核心问题</a></li>
+    <li><a onclick="scrollTo('#s2')">§2 Cache-Control 机制</a>
+      <ul>
+        <li><a onclick="scrollTo('#s2-1')">固定值与计时起点</a></li>
+        <li><a onclick="scrollTo('#s2-2')">缓存存储结构</a></li>
+        <li><a onclick="scrollTo('#s2-3')">新鲜性检查</a></li>
+      </ul></li>
+    <li><a onclick="scrollTo('#s3')">§3 多层控制点</a>
+      <ul>
+        <li><a onclick="scrollTo('#s3-1')">后端 → Nginx → CDN</a></li>
+        <li><a onclick="scrollTo('#s3-2')">各层配置示例</a></li>
+      </ul></li>
+    <li><a onclick="scrollTo('#s4')">§4 ETag 详解</a>
+      <ul>
+        <li><a onclick="scrollTo('#s4-1')">三层控制点</a></li>
+        <li><a onclick="scrollTo('#s4-2')">生成策略</a></li>
+      </ul></li>
+    <li><a onclick="scrollTo('#s5')">§5 最佳实践决策</a></li>
+    <li><a onclick="scrollTo('#s6')">§6 案例一：ETag + gzip</a></li>
+    <li><a onclick="scrollTo('#s7')">§7 案例二：缓存滥用</a></li>
+    <li><a onclick="scrollTo('#s8')">§8 黄金法则</a></li>
+    <li><a onclick="scrollTo('#s9')">§9 排查清单</a></li>
+    <li><a onclick="scrollTo('#s10')">§10 附录：配置模板</a></li>
+  </ul>
+</nav>
+
+<script>
+function scrollTo(sel){const el=document.querySelector(sel);if(el){el.scrollIntoView({behavior:'smooth'});}}
+</script>
+
+<div id="content">
+
+<h1>HTTP 缓存层：<span style="white-space:nowrap">Cache-Control</span> 与 ETag 的生产实践</h1>
+
+<p><strong>读者定位：</strong>后端、前端、运维工程师（假设已了解 HTTP/1.1 基础协议）</p>
+<p><strong>数据来源：</strong><code>big-list-of-20-common-bottlenecks.md</code> 第 39 行 — "In HTTP: headers, etags, not gzipping, etc."</p>
+<p><em>声明：本文档所有性能指标均为教学示例值，非真实生产数据。</em></p>
+
+<!-- ═══════ 1. 核心问题 ═══════ -->
+<h2 id="s1">§1 核心问题：缓存层为什么能成为系统瓶颈？</h2>
+
+<p>缓存层的两个职责：</p>
+<ul style="margin-bottom:14px;padding-left:20px;">
+  <li>减少回源请求数 → 节省服务器计算资源</li>
+  <li>减少响应体传输量 → 节省网络带宽</li>
+</ul>
+
+<p>当这两个目标<strong>冲突</strong>时，就可能制造反效果。</p>
+
+<svg viewBox="0 0 760 230" width="100%" style="border:1px solid #d0d7de;border-radius:8px;">
+  <!-- Conflict diagram -->
+  <rect x="10" y="30" width="220" height="170" rx="8" fill="#fff" stroke="#d0d7de"/>
+  <text x="120" y="58" text-anchor="middle" font-size="14" fill="#24292e" font-weight="600">减少回源请求数</text>
+  <line x1="50" y1="80" x2="190" y2="80" stroke="#d0d7de"/>
+  <text x="120" y="98" text-anchor="middle" font-size="13">节省服务器计算资源</text>
+  <line x1="50" y1="115" x2="190" y2="115" stroke="#d0d7de"/>
+  <text x="120" y="133" font-size="12" fill="#656d76">例：CDN 缓存命中</text>
+
+  <rect x="290" y="85" width="170" height="60" rx="24" fill="#f6a81d"/>
+  <text x="375" y="120" text-anchor="middle" font-size="14" fill="#fff" font-weight="600">冲突点</text>
+
+  <rect x="490" y="30" width="260" height="170" rx="8" fill="#fff" stroke="#d0d7de"/>
+  <text x="620" y="58" text-anchor="middle" font-size="14" fill="#24292e" font-weight="600">减少响应体传输量</text>
+  <line x1="530" y1="80" x2="710" y2="80" stroke="#d0d7de"/>
+  <text x="620" y="98" text-anchor="middle" font-size="13">节省网络带宽</text>
+
+  <line x1="240" y1="95" x2="285" y2="115" stroke="#6e7074" stroke-width="1.5"/>
+  <line x1="460" y1="115" x2="505" y2="95" stroke="#6e7074" stroke-width="1.5"/>
+
+  <!-- Consequence boxes -->
+  <rect x="40" y="185" width="300" height="32" rx="4" fill="#ffeef0"/>
+  <text x="190" y="206" text-anchor="middle" font-size="13">ETag 计算 + gzip 双重压缩 → 拖慢响应</text>
+
+  <rect x="390" y="185" width="360" height="32" rx="4" fill="#ffeef0"/>
+  <text x="570" y="206" text-anchor="middle" font-size="13">API 频繁条件请求 → 新鲜度检查风暴</text>
+</svg>
+
+<!-- ═══════ 2. Cache-Control ═══════ -->
+<h2 id="s2">§2 Cache-Control 机制</h2>
+
+<!-- 2.1 固定值 + 计时起点 -->
+<h3 id="s2-1">§2.1 固定值与计时起点</h3>
+
+<p>浏览器收到 <code>Cache-Control: max-age=3600</code>，这个数字永远不变。服务器每次响应都发送同样的值。</p>
+
+<svg viewBox="0 0 760 195" width="100%" style="border:1px solid #d0d7de;border-radius:8px;">
+  <!-- Timeline diagram -->
+  <line x1="60" y1="95" x2="740" y2="95" stroke="#d0d7de" stroke-width="1.5"/>
+  <circle cx="60" cy="95" r="8" fill="#0366d6"/><text x="42" y="135" text-anchor="middle" font-size="12">Date</text>
+  <circle cx="700" cy="95" r="8" fill="#34d058"/><text x="700" y="135" text-anchor="middle" font-size="12">fresh_until</text>
+  <text x="380" y="75" text-anchor="middle" font-size="12" fill="#656d76">0 s</text>
+  <text x="380" y="158" text-anchor="middle" font-size="12">+3600 s</text>
+
+  <!-- Progress bar fill -->
+  <rect x="68" y="85" width="624" height="10" rx="5" fill="#ddf4ff"/>
+  <text x="380" y="65" text-anchor="middle" font-size="14" fill="#24292e" font-weight="600">Date + max-age = fresh_until</text>
+
+  <!-- State labels -->
+  <rect x="130" y="148" width="260" height="28" rx="4" fill="#e6ffec"/>
+  <text x="260" y="167" text-anchor="middle" font-size="13">✓ 使用本地缓存</text>
+
+  <rect x="500" y="148" width="230" height="28" rx="4" fill="#ffeef0"/>
+  <text x="615" y="167" text-anchor="middle" font-size="13">→ 条件请求或回源</text>
+</svg>
+
+<p><code>fresh_until = Date + max-age</code>。在 <code>fresh_until</code> 之前，浏览器直接使用本地缓存。</p>
+
+<!-- 2.2 缓存存储结构 -->
+<h3 id="s2-2">§2.2 浏览器磁盘缓存存储结构</h3>
+
+<svg viewBox="0 0 760 285" width="100%" style="border:1px solid #d0d7de;border-radius:8px;">
+  <!-- Browser cache database card -->
+  <rect x="15" y="8" width="730" height="268" rx="10" fill="#fff" stroke="#d0d7de"/>
+
+  <text x="380" y="35" text-anchor="middle" font-size="14" fill="#24292e" font-weight="600">浏览器磁盘缓存数据库 (LRU, 约磁盘 5%)</text>
+
+  <!-- Key field -->
+  <rect x="30" y="50" width="700" height="26" rx="4" fill="#f6a81d"/>
+  <text x="380" y="68" text-anchor="middle" font-size="13">Key: GET https://example.com/api/users  (URI + HTTP Method)</text>
+
+  <!-- Fields -->
+  <rect x="30" y="85" width="700" height="24" fill="#f6f8fa"/>
+  <text x="50" y="102">Status: 200 OK</text>
+  <text x="340" y="102">Cache-Control: max-age=3600  <tspan fill="#0366d6" font-weight="600">[固定值]</tspan></text>
+
+  <rect x="30" y="114" width="700" height="24" fill="#f6f8fa"/>
+  <text x="50" y="131">Date: Wed, 01 Jan 2026 12:00:00 GMT  <tspan fill="#0366d6" font-weight="600">[计时起点]</tspan></text>
+
+  <rect x="30" y="146" width="700" height="28" rx="4" fill="#e6ffec"/>
+  <text x="380" y="165" text-anchor="middle" font-size="13">expires_time = Date + max-age → 12:05:05 + 3600s = 13:05:05</text>
+
+  <rect x="30" y="182" width="700" height="24" fill="#f6f8fa"/>
+  <text x="50" y="199">cached_at: 12:05:05</text>
+  <text x="300" y="199">body: [{ ...json body... }]  <tspan fill="#0366d6" font-weight="600">[响应体]</tspan></text>
+
+  <!-- Browser paths -->
+  <text x="50" y="235" font-size="12" fill="#656d76">浏览器磁盘路径：</text>
+  <rect x="30" y="245" width="175" height="20" rx="3" fill="#f6f8fa"/>
+  <text x="117" y="259" text-anchor="middle" font-size="11">Chrome</text>
+  <rect x="209" y="245" width="168" height="20" rx="3" fill="#f6f8fa"/>
+  <text x="293" y="259" text-anchor="middle" font-size="11">Firefox</text>
+  <rect x="376" y="245" width="175" height="20" rx="3" fill="#f6f8fa"/>
+  <text x="463" y="259" text-anchor="middle" font-size="11">Safari</text>
+</svg>
+
+<!-- 2.3 新鲜性检查 -->
+<h3 id="s2-3">§2.3 浏览器何时检查缓存新鲜性？</h3>
+
+<p>每次发起请求时，浏览器做如下判断。</p>
+
+<svg viewBox="0 0 760 200" width="100%" style="border:1px solid #d0d7de;border-radius:8px;">
+  <!-- Decision flowchart -->
+  <polygon points="380,25 460,90 380,105 300,90" fill="#f6a81d" stroke="#bd5b00" stroke-width="1.5"/>
+  <text x="380" y="62" text-anchor="middle" font-size="12" fill="#fff">current_time</text>
+  <text x="380" y="78" text-anchor="middle" font-size="12" fill="#fff">&lt; cached_at + max_age?</text>
+
+  <!-- Yes branch -->
+  <rect x="30" y="145" width="280" height="48" rx="6" fill="#e6ffec"/>
+  <text x="170" y="168" text-anchor="middle" font-size="13">✓ 响应体"新鲜"</text>
+  <text x="170" y="185" text-anchor="middle" font-size="12">直接使用本地缓存，跳过网络</text>
+
+  <!-- No branch -->
+  <rect x="450" y="145" width="280" height="48" rx="6" fill="#ffeef0"/>
+  <text x="590" y="168" text-anchor="middle" font-size="13">✗ 响应体"陈旧"</text>
+  <text x="590" y="185" text-anchor="middle" font-size="12">发送条件请求 <code>If-None-Match</code></text>
+
+  <!-- Arrows -->
+  <line x1="300" y1="105" x2="170" y2="145" stroke="#34d058" stroke-width="2"/>
+  <text x="190" y="130" fill="#34d058" font-size="12">yes</text>
+  <line x1="460" y1="105" x2="590" y2="145" stroke="#f85149" stroke-width="2"/>
+  <text x="507" y="130" fill="#f85149" font-size="12">no</text>
+</svg>
+
+<!-- ═══════ 3. 多层架构 ═══════ -->
+<h2 id="s3">§3 Cache-Control：在哪里设置？</h2>
+
+<!-- 多层控制点 SVG -->
+<h3 id="s3-1">§3.1 四层控制点 — 后端 → Nginx → CDN</h3>
+
+<p>Cache-Control 的值由<strong>离浏览器最近的缓存节点</strong>决定。</p>
+
+<svg viewBox="0 0 760 345" width="100%" style="border:1px solid #d0d7de;border-radius:8px;">
+  <!-- Layers -->
+  <rect x="10" y="42" width="170" height="285" rx="6" fill="#fdf8ea"/>
+  <rect x="10" y="22" width="170" height="24" rx="6" fill="#f6a81d"/>
+  <text x="95" y="39" text-anchor="middle" font-size="13" fill="#fff">后端应用层</text>
+
+  <rect x="200" y="42" width="170" height="285" rx="6" fill="#e8f4fd"/>
+  <rect x="200" y="22" width="170" height="24" rx="6" fill="#54aeff"/>
+  <text x="285" y="39" text-anchor="middle" font-size="13" fill="#fff">Nginx 反向代理</text>
+
+  <rect x="390" y="42" width="170" height="285" rx="6" fill="#e6ffec"/>
+  <rect x="390" y="22" width="170" height="24" rx="6" fill="#34d058"/>
+  <text x="475" y="39" text-anchor="middle" font-size="13" fill="#fff">CDN 边缘节点</text>
+
+  <rect x="580" y="42" width="170" height="285" rx="6" fill="#ffeef0"/>
+  <rect x="580" y="22" width="170" height="24" rx="6" fill="#f85149"/>
+  <text x="665" y="39" text-anchor="middle" font-size="13" fill="#fff">浏览器</text>
+
+  <!-- Arrows (request flow right) -->
+  <line x1="185" y1="190" x2="195" y2="190" stroke="#6e7074" stroke-width="2.5"/>
+  <polygon points="198,190 190,183 190,197" fill="#6e7074"/>
+  <text x="145" y="185" text-anchor="middle" font-size="9" fill="#6e7074">请求</text>
+
+  <line x1="375" y1="208" x2="385" y2="208" stroke="#6e7074" stroke-width="2.5"/>
+  <polygon points="388,208 380,201 380,215" fill="#6e7074"/>
+  <text x="340" y="203" text-anchor="middle" font-size="9" fill="#6e7074">回源</text>
+
+  <line x1="565" y1="226" x2="575" y2="226" stroke="#6e7074" stroke-width="2.5"/>
+  <polygon points="578,226 570,219 570,233" fill="#6e7074"/>
+  <text x="530" y="221" text-anchor="middle" font-size="9" fill="#6e7074">响应</text>
+
+  <!-- Arrow (response flow left) -->
+  <path d="M630,155 Q470,140 285,165 Q130,195 130,215" fill="none" stroke="#34d058" stroke-width="2" stroke-dasharray="6,3"/>
+  <polygon points="195,208 170,196 183,204" fill="#34d058"/>
+  <text x="160" y="192" fill="#34d058" font-size="9">header 透传</text>
+
+  <!-- Spring Boot -->
+  <rect x="30" y="72" width="130" height="58" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="95" y="93" text-anchor="middle" font-size="12">Spring Boot</text>
+  <text x="95" y="108" text-anchor="middle" font-size="11">.cacheControl(</text>
+  <text x="95" y="123" text-anchor="middle" font-size="10" fill="#656d76">.maxAge(30, S))</text>
+
+  <!-- Go/Gin -->
+  <rect x="30" y="142" width="130" height="58" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="95" y="163" text-anchor="middle" font-size="12">Go (Gin)</text>
+  <text x="95" y="178" text-anchor="middle" font-size="10">c.Header(</text>
+  <text x="95" y="193" text-anchor="middle" font-size="10">"no-store")</text>
+
+  <!-- location /static -->
+  <rect x="215" y="72" width="140" height="58" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="285" y="93" text-anchor="middle" font-size="12">location /static/</text>
+  <text x="285" y="108" text-anchor="middle" font-size="11">expires 7d;</text>
+  <text x="285" y="123" text-anchor="middle" font-size="10">→ max-age=604800</text>
+
+  <!-- location /api -->
+  <rect x="215" y="142" width="140" height="58" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="285" y="163" text-anchor="middle" font-size="12">location /api/</text>
+  <text x="285" y="178" text-anchor="middle" font-size="10">Cache-Control:</text>
+  <text x="285" y="193" text-anchor="middle" font-size="10">no-store</text>
+
+  <!-- CDN policy -->
+  <rect x="410" y="72" width="130" height="58" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="475" y="93" text-anchor="middle" font-size="12">Cache Policy</text>
+  <text x="475" y="108">/*.{js,css} →</text>
+  <text x="475" y="123">max-age=31536000</text>
+
+  <rect x="410" y="142" width="130" height="58" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="475" y="163">/api/* →</text>
+  <text x="475" y="178">no-cache,</text>
+  <text x="475" y="193">max-age=0</text>
+
+  <!-- Browser receiving header -->
+  <rect x="610" y="125" width="110" height="85" rx="4" fill="#f6a81d"/>
+  <text x="665" y="148" text-anchor="middle" font-size="12">浏览器收到</text>
+  <text x="665" y="163">CDN header</text>
+  <line x1="20" y1="178" x2="100" y2="178" stroke="#fff"/>
+  <text x="665" y="193">最外层生效</text>
+
+  <!-- Bottom note -->
+  <rect x="215" y="308" width="330" height="24" rx="4" fill="#f6a81d"/>
+  <text x="380" y="324" text-anchor="middle" font-size="12" fill="#fff">Cache-Control 由离浏览器最近的节点决定</text>
+</svg>
+
+<!-- 各层示例代码 (minimal) -->
+<h3 id="s3-2">§3.2 各层配置要点</h3>
+
+<p><strong>后端应用（Spring Boot / Go）：</strong></p>
+<pre><code>// Spring Boot — 控制器级设置，固定 max-age=30
+.cacheControl(CacheControl.maxAge(30, SECONDS));
+
+// Go — 动态 max-age：热门商品1分钟，冷门24小时
+if resource.IsHot() { c.Header("Cache-Control", "max-age=60") }
+else                 { c.Header("Cache-Control", "max-age=86400") }</code></pre>
+
+<p><strong>Nginx（按 URI 类型分组）：</strong></p>
+<pre><code>location ~* \.(js|css)$ { expires 7d; }                  // max-age=604800
+location ~* \.(png|jpg)$  { expires 30d; }                // max-age=2592000
+location /api/ { add_header Cache-Control "no-store"; }   // 不缓存</code></pre>
+
+<p><strong>CDN 控制台（URI 匹配策略）：</strong></p>
+<table>
+<tr><th>URI Pattern</th><th>策略</th></tr>
+<tr><td><code>/*.{js,css}</code></td><td class="tag tag-green">max-age=31536000, immutable</td></tr>
+<tr><td>/<code>*.html</code></td><td class="tag tag-blue">no-cache, must-revalidate (每次检查 ETag)</td></tr>
+<tr><td>/<code>api/*</code></td><td class="tag tag-red">no-cache, max-age=0 (直接回源)</td></tr>
+</table>
+
+<!-- ═══════ 4. ETag ═══════ -->
+<h2 id="s4">§4 ETag：在哪里设置？如何生成值？</h2>
+
+<!-- 4.1 三层控制点 -->
+<h3 id="s4-1">§4.1 三层架构下的三个 ETag 控制点</h3>
+
+<svg viewBox="0 0 760 295" width="100%" style="border:1px solid #d0d7de;border-radius:8px;">
+  <!-- Browser (right) -->
+  <rect x="570" y="28" width="170" height="248" rx="6" fill="#ffeef0"/>
+  <rect x="570" y="8" width="170" height="24" rx="6" fill="#f85149"/>
+  <text x="655" y="25" text-anchor="middle" font-size="13" fill="#fff">浏览器</text>
+  <rect x="590" y="48" width="130" height="52" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="655" y="68">Cache:</text>
+  <text x="655" y="83">Key=(URI,ETag)</text>
+  <text x="655" y="103">If-None-Match:</text>
+  <text x="655" y="118">"abc"</text>
+  <rect x="590" y="138" width="130" height="46" rx="4" fill="#e6ffec"/>
+  <text x="655" y="157">304 → 用旧 body</text>
+  <text x="655" y="173">刷新缓存时间戳</text>
+
+  <!-- CDN (middle) -->
+  <rect x="380" y="28" width="170" height="248" rx="6" fill="#e6ffec"/>
+  <rect x="380" y="8" width="170" height="24" rx="6" fill="#34d058"/>
+  <text x="465" y="25" text-anchor="middle" font-size="13" fill="#fff">CDN 边缘节点</text>
+  <rect x="400" y="52" width="130" height="68" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="465" y="72">ETag: "abc"</text>
+  <text x="465" y="87">← CDN 自己计算</text>
+  <text x="465" y="102">命中 → 直接返回</text>
+  <rect x="400" y="138" width="130" height="28" rx="4" fill="#e6ffec"/>
+  <text x="465" y="157">304 (无 body)</text>
+
+  <!-- Nginx (left) -->
+  <rect x="190" y="28" width="170" height="248" rx="6" fill="#e8f4fd"/>
+  <rect x="190" y="8" width="170" height="24" rx="6" fill="#54aeff"/>
+  <text x="275" y="25" text-anchor="middle" font-size="13" fill="#fff">Nginx 反向代理</text>
+  <rect x="210" y="52" width="130" height="48" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="275" y="72">etag on; → MD5</text>
+  <text x="275" y="87">前 8 字节大写</text>
+  <rect x="210" y="114" width="130" height="48" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="275" y="134">etag off;</text>
+  <text x="275" y="149">关闭 (节省 CPU)</text>
+  <rect x="210" y="184" width="130" height="28" rx="4" fill="#ffeef0"/>
+  <text x="275" y="203">proxy_cache (可选)</text>
+
+  <!-- Backend -->
+  <rect x="10" y="28" width="170" height="248" rx="6" fill="#fdf8ea"/>
+  <rect x="10" y="8" width="170" height="24" rx="6" fill="#f6a81d"/>
+  <text x="95" y="25" text-anchor="middle" font-size="13" fill="#fff">后端应用层</text>
+  <rect x="30" y="52" width="130" height="72" rx="4" fill="#fff" stroke="#d0d7de"/>
+  <text x="95" y="73">ctx.Header("ETag")</text>
+  <text x="95" y="88">= sha256(version,</text>
+  <text x="95" y="103">modified_time)</text>
+  <rect x="30" y="144" width="130" height="52" rx="4" fill="#e6ffec"/>
+  <text x="95" y="163">匹配 → 返回 304</text>
+  <text x="95" y="178">无 body (省带宽)</text>
+
+  <!-- Arrows -->
+  <line x1="175" y1="83" x2="188" y2="83" stroke="#6e7074" stroke-width="2"/>
+  <polygon points="190,83 182,76 182,90" fill="#6e7074"/>
+  <line x1="365" y1="98" x2="378" y2="98" stroke="#6e7074" stroke-width="2"/>
+  <polygon points="380,98 372,91 372,105" fill="#6e7074"/>
+  <line x1="555" y1="123" x2="568" y2="123" stroke="#6e7074" stroke-width="2"/>
+  <polygon points="570,123 562,116 562,130" fill="#6e7074"/>
+
+  <!-- Bottom note -->
+  <rect x="215" y="282" width="330" height="20" rx="4" fill="#f6a81d"/>
+  <text x="380" y="297" text-anchor="middle" font-size="12" fill="#fff">ETag 由离浏览器最近的缓存节点写入并生效</text>
+</svg>
+
+<!-- 4.2 生成策略 -->
+<h3 id="s4-2">§4.2 ETag 生成策略对比</h3>
+
+<table>
+<tr><th>策略</th><th>适用场景</th><th>优点</th><th>缺点</th></tr>
+<tr><td>A. 内容 hash（Nginx 默认）</td><td>静态文件</td><td>语义正确（内容一致则值一致）</td><td>每次请求 MD5 计算 (高 QPS CPU)</td></tr>
+<tr><td>B. 后端 version + timestamp</td><td class="tag tag-blue">API 接口（推荐）</td><td>高效 (读两个字段)</td><td>需应用层维护版本号/时间戳</td></tr>
+<tr><td>C. 固定无意义值 (如 "fixed")</td><td>Nginx 作 CDN 上游</td><td>零 CPU 开销</td><td>无法通过 304 优化</td></tr>
+<tr><td>D. <code>tag off;</code></td><td class="tag tag-green">高频 API（推荐）</td><td>零 CPU 开销</td><td>由 Cache-Control 替代优化</td></tr>
+</table>
+
+<!-- ═══════ 5. 最佳实践决策表 ═══════ -->
+<h2 id="s5">§5 Cache-Control + ETag：最佳实践决策</h2>
+
+<table>
+<tr><th style="width:170px">资源类型</th><th>推荐 Cache-Control</th><th style="width:100px">ETag？</th><th>说明</th></tr>
+<tr><td>HTML 入口页 (index.html)</td><td class="tag tag-blue">no-cache, must-revalidate</td><td class="tag tag-green">需要 (CDN)</td><td>每次向 CDN 检查，通过 ETag 判断是否拿到新版</td></tr>
+<tr><td>CSS / JS (文件名带 hash)</td><td class="tag tag-green">max-age=31536000, immutable</td><td class="tag tag-red">不需要</td><td>文件名含内容 hash → 永久缓存安全</td></tr>
+<tr><td>图片 / 字体 (png/jpg/svg)</td><td class="tag tag-green">max-age=31536000</td><td class="tag tag-red">不需要</td><td>文件名可控时可长期缓存，注意 CDN purge 匹配</td></tr>
+<tr><td>API 响应 (/api/*)</td><td class="tag tag-red">no-store 或 max-age=0</td><td class="tag tag-blue">可选 (后端 hash)</td><td>实时数据。条件缓存用 <code>max-age=30</code> + ETag</td></tr>
+<tr><td>WebSocket SSE 事件流</td><td class="tag tag-red">no-cache (关闭缓存)</td><td class="tag tag-red">不需要</td><td>应用层处理验证，不适用 HTTP 缓存</td></tr>
+</table>
+
+<p><strong>生效规则：</strong>后端返回 <code>no-store</code> → 如果 CDN 启用了缓存策略，后端的 header<strong>不生效</strong>（会被覆盖）。CDN 控制台设置的策略直接决定浏览器收到的 header。</p>
+
+<!-- ═══════ 6. 案例一：ETag + gzip ═══════ -->
+<h2 id="s6">§6 生产案例一：ETag + gzip 双重开销</h2>
+
+<p>一个云文档编辑服务，接口返回 JSON (约 2-4KB)。平台同时开启了 <code>gzip on;</code> 和 Nginx 默认的 <code>tag on;</code>。</p>
+
+<p><strong>现象 (QPS &gt; 3000)：</strong></p>
+
+<div style="max-width:680px;margin:14px 0;">
+  <div class="chart-bar"><span class="chart-label">P99 (修复前)</span><div class="chart-track"><div class="chart-fill fill-red" style="width:100%">450ms</div></div></div>
+  <div class="chart-bar"><span class="chart-label">CPU (修复前)</span><div class="chart-track"><div class="chart-fill fill-red" style="width:92%">92%</div></div></div>
+  <div class="chart-bar"><span class="chart-label">QPS (修复前)</span><div class="chart-track"><div class="chart-fill fill-red" style="width:18.7%">2,800</div></div></div>
+  <hr style="margin:12px 0;border:none;border-top:2px solid #f6a81d;">
+  <div class="chart-bar"><span class="chart-label">P99 (修复后)</span><div class="chart-track"><div class="chart-fill fill-green" style="width:18.9%">85ms ↓81%</div></div></div>
+  <div class="chart-bar"><span class="chart-label">CPU (修复后)</span><div class="chart-track"><div class="chart-fill fill-green" style="width:35%">35% ↓62%</div></div></div>
+  <div class="chart-bar"><span class="chart-label">QPS (修复后)</span><div class="chart-track"><div class="chart-fill fill-green" style="width:100%">15,000 ↑436%</div></div></div>
+</div>
+
+<p><strong>根因：</strong>Nginx 先算 MD5 做 ETag，再做 gzip。每次请求 = 完整 MD5 计算 + gzip 压缩 → 双重 CPU 负担。</p>
+
+<pre><code>// Nginx 修复方案：关闭 ETag + 对小响应跳过 gzip
+location /api/documents/ {
+    etag off;                      // ← 由 Cache-Control 控制缓存
+    gzip on;                       // ← 只对大响应启用压缩
+    gzip_min_length 1024;          // ← &lt;1KB 的跳过 (省 CPU)
+    gzip_types application/json;</code></pre>
+
+<!-- ═══════ 7. 案例二：缓存滥用 ═══════ -->
+<h2 id="s7">§7 生产案例二：Cache-Control 滥用导致全站冷启动</h2>
+
+<p>前端工程师将 <code>index.html</code> 设置了 <code>Cache-Control: max-age=86400</code> (24 小时)。</p>
+
+<p><strong>问题链：</strong></p>
+<ol style="margin:12px 0 12px 24px;">
+  <li>CDN 仍持有旧版 <code>index.html</code> (缓存未过期)。</li>
+  <li>用户刷新 → CDN 返回旧 HTML → 引用了旧版 JS。</li>
+  <li>页面完全不可用。即使新代码已部署到 CDN。</li>
+</ol>
+
+<p><strong>修复：</strong>主页面 <code>Cache-Control: no-cache, must-revalidate</code> → 每次向 CDN 检查。静态资源文件名带 hash → <code>max-age=31536000, immutable</code> 安全。</p>
+
+<!-- ═══════ 8. 黄金法则 ═══════ -->
+<h2 id="s8">§8 四个黄金法则</h2>
+
+<div class="card-grid">
+  <div class="card">
+    <!-- Shield icon SVG -->
+    <svg class="card-icon" viewBox="0 0 40 40"><rect x="12" y="6" width="16" height="24" rx="3" fill="#cb2431"/><text x="20" y="25" text-anchor="middle" font-size="16" fill="#fff">✕</text></svg>
+    <div class="card-title">ETag 不是免费的</div>
+    <div class="card-desc">高频 API 应关闭它。计算 hash、访问数据库都消耗 CPU。</div>
+  </div>
+  <div class="card">
+    <!-- Shield icon -->
+    <svg class="card-icon" viewBox="0 0 40 40"><rect x="12" y="6" width="16" height="24" rx="3" fill="#0366d6"/><text x="20" y="25" text-anchor="middle" font-size="16" fill="#fff">⬆</text></svg>
+    <div class="card-title">Cache-Control &gt; ETag</div>
+    <div class="card-desc">正确配置缓存生命周期比条件请求节省更多资源。优先配 Cache-Control。</div>
+  </div>
+  <div class="card">
+    <!-- Compression icon -->
+    <svg class="card-icon" viewBox="0 0 40 40"><rect x="12" y="8" width="16" height="20" rx="3" fill="#bd5b00"/><text x="20" y="24" text-anchor="middle" font-size="16" fill="#fff">⚡</text></svg>
+    <div class="card-title">gzip 对小响应负优化</div>
+    <div class="card-desc"><code>gzip_min_length</code> 至少 512B-1KB。小响应体不值得压缩。</div>
+  </div>
+  <div class="card">
+    <!-- Layers icon -->
+    <svg class="card-icon" viewBox="0 0 40 40"><rect x="12" y="8" width="16" height="5" rx="1" fill="#24292e"/><rect x="10" y="16" width="20" height="5" rx="1" fill="#6e7074"/><rect x="8" y="24" width="24" height="5" rx="1" fill="#6e7074"/></svg>
+    <div class="card-title">CDN 与后端职责分离</div>
+    <div class="card-desc">后端 → CDN 不需要 ETag。ETag 只在浏览器到 CDN 层有优化价值。</div>
+  </div>
+</div>
+
+<!-- ═══════ 9. 排查清单 ═══════ -->
+<h2 id="s9">§9 常见问题排查清单</h2>
+
+<!-- Collapsible list -->
+<details><summary class="card-title">⚠ 后端 CPU 高但网络流量不大</summary>
+<div class="content">
+  <p><strong>可能问题：</strong>ETag 计算 + gzip 双重开销；条件请求风暴。</p>
+  <p><strong>验证方法：</strong><code>ab -c 100</code> 压测，对比开启/关闭 ETag。</p>
+</div></details>
+
+<details><summary class="card-title">⚠ 前端更新后大量用户拿到旧版</summary>
+<div class="content">
+  <p><strong>可能问题：</strong>Cache-Control 过期太长 + CDN purge 异步延迟。</p>
+  <p><strong>验证方法：</strong><code>curl -I &lt;url&gt;</code> 检查 response headers。</p>
+</div></details>
+
+<details><summary class="card-title">⚠ P99 延时高、吞吐低</summary>
+<div class="content">
+  <p><strong>可能问题：</strong>gzip + etag 双重处理；小响应体不值得压缩。</p>
+  <p><strong>验证方法：</strong>Nginx <code>access.log</code> + <code>upstream_response_time</code> 统计。</p>
+</div></details>
+
+<details><summary class="card-title">⚠ 304 状态码占比异常高 (&gt;60%) 但后端仍跑满</summary>
+<div class="content">
+  <p><strong>可能问题：</strong>大量 HEAD 条件请求打到 Origin。</p>
+  <p><strong>验证方法：</strong>Nginx <code>status 304</code> 计数或日志分析。</p>
+</div></details>
+
+<details><summary class="card-title">⚠ CDN 回源率突然激增</summary>
+<div class="content">
+  <p><strong>可能问题：</strong>Purge + ETag 同步不一致导致缓存穿透。</p>
+  <p><strong>验证方法：</strong>CDN 监控面板回源统计。</p>
+</div></details>
+
+<!-- ═══════ 10. 附录 ═══════ -->
+<h2 id="s10">§10 附录 A：各层配置模板</h2>
+
+<pre><code>// ===== JS/CSS — 7天缓存 =====
+location ~* \.(js|css)$ { expires 7d; }
+
+// ===== 图片 / 字体 — 30天缓存 =====
+location ~* \.(png|jpg|svg|woff2)$ { expires 30d; }
+
+// ===== HTML 入口页 — 每次检查 =====
+location / { add_header Cache-Control "no-cache, must-revalidate"; }
+
+// ===== API — 强制不缓存 =====
+location /api/ { add_header Cache-Control "no-store"; }
+
+etag off;                                // 全局关闭 (推荐)
+gzip on;
+gzip_min_length 1024;</code></pre>
+
+<footer>
+<p><strong>数据来源：</strong><code>big-list-of-20-common-bottlenecks.md</code> 第 39 行 — "In HTTP: headers, etags, not gzipping, etc."</p>
+<p><strong>声明：</strong>所有性能指标均为教学示例值，非真实生产数据。</p>
+<p><strong>创建日期：</strong>2026 年 1 月</p>
+</footer>
+
+</div><!-- content -->
+</body>
+</html>
